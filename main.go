@@ -35,12 +35,15 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
         }
         log.Println("Saving",fileName, "(",len(data),"bytes)")
         fo, err := os.Create(path.Join("data",fileName))
-        if err != nil { panic(err) }
+        if err != nil {
+          log.Fatal(err)
+        }
         // close fo on exit and check for its returned error
         defer func() {
-            if err := fo.Close(); err != nil {
-                panic(err)
-            }
+          if err := fo.Close(); err != nil {
+              log.Fatal(err)
+          }
+          log.Println("Finished",fileName)
         }()
         w := bufio.NewWriter(fo)
         written, err := w.Write(data)
@@ -49,8 +52,8 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
         }
         log.Println(written, "bytes written to",fileName)
         w.Flush()
-        block <- 1
       }
+      block <- 1
     }(item)
 
     go func(item Item) {
@@ -66,9 +69,8 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
     }(item)
 
     <-block
-    for i :=0 ; i < len(item.Documents); i++ {
-      <-block
-    }
+    <-block
+    log.Println("Moving on from",fileName)
 
     close(block)
   }
@@ -230,14 +232,16 @@ func main() {
 
   close(requests)
 
-
-  select {
-    case <-block:
-      numWorkers--
-      if numWorkers == 0 {
-        close(annotationsProcessor)
-        <-doneWriting
-        return
-      }
+  for {
+    select {
+      case <-block:
+       numWorkers--
+       log.Println("A thread done: ",numWorkers, " remaining")
+       if numWorkers == 0 {
+         close(annotationsProcessor)
+         <-doneWriting
+         return
+        }
+    }
   }
 }
