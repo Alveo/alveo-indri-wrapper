@@ -28,8 +28,8 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
 
     block := make(chan int,2)
     go func(item Item) {
-      for _,doc := range item.Documents {
-        data, err := api.Get(doc.Url)
+//      for _,doc := range item.Documents {
+        data, err := api.Get(item.Primary_text_url)
         if err != nil {
           log.Fatal(err)
         }
@@ -52,19 +52,17 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
         }
         log.Println(written, "bytes written to",fileName)
         w.Flush()
-      }
+ //     }
       block <- 1
     }(item)
 
     go func(item Item) {
-    /*  annotations, err := api.GetAnnotations(item)
+      annotations, err := api.GetAnnotations(item)
       if err != nil {
         log.Fatal(err)
-      }*/
-      var da documentAnnotations
-     // da.AnnotationList = &annotations.Annotations
-      da.Filename = fileName
-      annotationsProcessor <- &da
+      }
+      da := &documentAnnotations{fileName,&annotations}
+      annotationsProcessor <- da
       block <-1
     }(item)
 
@@ -131,8 +129,6 @@ func (api *HcsvlabApi) Get(url string) (data []byte, err error) {
   log.Println("Requesting ",url,"with key",api.key)
   start := time.Now()
   resp, err := client.Do(req)
-  end := time.Now()
-  log.Println("Time",url,end.Sub(start).Seconds(),resp.ContentLength)
   if err != nil {
     return
   }
@@ -140,7 +136,9 @@ func (api *HcsvlabApi) Get(url string) (data []byte, err error) {
     err = errors.New("Status " + strconv.Itoa(resp.StatusCode) + " from " + url)
     return
   }
-    data, err = ioutil.ReadAll(resp.Body)
+  data, err = ioutil.ReadAll(resp.Body)
+  end := time.Now()
+  log.Println("Time",url,end.Sub(start).Seconds(),resp.ContentLength)
   resp.Body.Close()
   return
 }
@@ -209,19 +207,57 @@ func main() {
   go func() {
     tagid := 1
     docid := 1
+    log.Println("Starting to annotate")
+
+    // Create annotations writer
+    annFo, err := os.Create("annotation.offsets")
+    if err != nil {
+      log.Fatal(err)
+    }
+    defer func() {
+      doneWriting <- 1
+    }()
+    defer func() {
+      if err := annFo.Close(); err != nil {
+          log.Fatal(err)
+      }
+      log.Println("Closing annFo")
+    }()
+    annWriter := bufio.NewWriter(annFo)
+
+    // Create index properties writer
+    ixFo, err := os.Create("index.properties")
+    if err != nil {
+      log.Fatal(err)
+    }
+    defer func() {
+      if err := ixFo.Close(); err != nil {
+          log.Fatal(err)
+      }
+      log.Println("Closing ixFo")
+    }()
+    ixWriter := bufio.NewWriter(ixFo)
+
+    fmt.Fprintf(ixWriter,"<parameters>\n<index>repo</index>\n")
+    fmt.Fprintf(ixWriter,"<corpus>\n")
+    fmt.Fprintf(ixWriter,"  <class>txt</class>\n")
+    fmt.Fprintf(ixWriter,"  <annotations>annotation.offsets</annotations>\n")
+
     for da := range annotationsProcessor {
-   /*   for _, annotation := range da.AnnotationList.Annotations {
-        log.Println(annotation)
+      fmt.Fprintf(ixWriter,"  <path>data/%s</path>\n",da.Filename)
+      log.Println("writing annotations for",da.Filename)
+
+      for _, annotation := range da.AnnotationList.Annotations {
         if int(annotation.End-annotation.Start) == 0 {
-          fmt.Printf("%d\tannotation\t%d\t%s\t%d\t%d\t\t0\t\n",docid,tagid,annotation.Label,int(annotation.Start),int(annotation.End-annotation.Start))
+          fmt.Fprintf(annWriter,"%d\tannotation\t%d\t%s\t%d\t%d\t\t0\t\n",docid,tagid,annotation.Label,int(annotation.Start),int(annotation.End-annotation.Start))
         } else {
-          fmt.Printf("%d\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",docid,tagid,annotation.Label,int(annotation.Start),int(annotation.End-annotation.Start))
+          fmt.Fprintf(annWriter,"%d\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",docid,tagid,annotation.Label,int(annotation.Start),int(annotation.End-annotation.Start))
         }
         tagid++
-      }*/
-       fmt.Println(da, tagid,docid)
+      }
+      docid++
     }
-    doneWriting <- 1
+    fmt.Fprintf(ixWriter,"</corpus>\n</parameters>")
   }()
 
   for _, s := range il.Items {
