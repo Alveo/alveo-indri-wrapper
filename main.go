@@ -162,6 +162,8 @@ func main() {
       docid++
     }
     fmt.Fprintf(ixWriter,"</corpus>\n</parameters>")
+    annWriter.Flush()
+    ixWriter.Flush()
   }()
 
   for _, s := range il.Items {
