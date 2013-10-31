@@ -12,18 +12,22 @@ import (
 )
 
 
+
+// A representation of an item list from the HCSvLab API
 type ItemList struct {
   Name string
   Num_items float64
   Items []string
 }
 
+// A representation of a document within an item from the HCSvLab API
 type DocIdentifier struct {
   Size string
   Url string
   Type string
 }
 
+// A representation of the annotations associated with an item from the HCSvLab API
 type AnnotationList struct {
   Item_id string
   Item string
@@ -31,6 +35,7 @@ type AnnotationList struct {
   Annotations []Annotation
 }
 
+// An annotation associated with a documents. AnnotationLists have more than one of these.
 type Annotation struct {
   Type string
   Label string
@@ -38,6 +43,7 @@ type Annotation struct {
   End float64
 }
 
+// An item that contains metadata about a document from the HCSvLab API
 type Item struct {
  Catalog_url string
  Metadata map[string]string
