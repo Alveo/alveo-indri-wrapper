@@ -7,10 +7,11 @@ import (
   "os"
   "path"
   "strconv"
+  "github.com/TimothyJones/hcsvlabapi"
 )
 
 
-func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
+func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
   for r := range requests {
     item, erro := api.GetItem(r)
     if erro != nil {
@@ -21,7 +22,7 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
     fileName := item.Metadata["Collection"] + item.Metadata["Identifier"]
 
     block := make(chan int,2)
-    go func(item Item) {
+    go func(item hcsvlabapi.Item) {
 //      for _,doc := range item.Documents {
         data, err := api.Get(item.Primary_text_url)
         if err != nil {
@@ -50,7 +51,7 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
       block <- 1
     }(item)
 
-    go func(item Item) {
+    go func(item hcsvlabapi.Item) {
       annotations, err := api.GetAnnotations(item)
       if err != nil {
         log.Fatal(err)
@@ -72,7 +73,7 @@ func worker(api HcsvlabApi,requests chan string,done chan int, annotationsProces
 
 type documentAnnotations struct {
   Filename string
-  AnnotationList *AnnotationList
+  AnnotationList* hcsvlabapi.AnnotationList
 }
 
 func main() {
@@ -91,7 +92,7 @@ func main() {
     log.Fatal(err)
   }
   log.Println("Number of workers:",numWorkers)
-  api := HcsvlabApi{os.Args[2],os.Args[3]}
+  api := hcsvlabapi.Api{os.Args[2],os.Args[3]}
 
   requests := make(chan string,200)
   block := make(chan int,numWorkers)
