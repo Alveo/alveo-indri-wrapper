@@ -13,16 +13,17 @@ import (
 
 func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
   for r := range requests {
-    item, erro := api.GetItem(r)
+    item, erro := api.GetItemFromUri(r)
     if erro != nil {
       log.Fatal(erro)
     }
     log.Println(item.Catalog_url)
 
-    fileName := item.Metadata["Collection"] + item.Metadata["Identifier"]
+    fileName := item.Metadata["dc:identifier"]
 
     block := make(chan int,2)
     go func(item hcsvlabapi.Item) {
+//        log.Println("Recieved ",item);
 //      for _,doc := range item.Documents {
         data, err := api.Get(item.Primary_text_url)
         if err != nil {
@@ -52,12 +53,12 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
     }(item)
 
     go func(item hcsvlabapi.Item) {
-      annotations, err := api.GetAnnotations(item)
+/*      annotations, err := api.GetAnnotations(item)
       if err != nil {
         log.Fatal(err)
       }
       da := &documentAnnotations{fileName,&annotations}
-      annotationsProcessor <- da
+      annotationsProcessor <- da*/
       block <-1
     }(item)
 
@@ -93,6 +94,14 @@ func main() {
   }
   log.Println("Number of workers:",numWorkers)
   api := hcsvlabapi.Api{os.Args[2],os.Args[3]}
+  
+  ver,err := api.GetVersion()
+  if err != nil {
+    log.Fatal(err)
+  }
+  if ver.Api_version != "HEAD (sha1:35715bc)" {
+    log.Fatal("Server API version is incorrect:",ver)
+  }
 
   requests := make(chan string,200)
   block := make(chan int,numWorkers)
@@ -122,26 +131,29 @@ func main() {
     defer func() {
       doneWriting <- 1
     }()
+    annWriter := bufio.NewWriter(annFo)
+
     defer func() {
+      annWriter.Flush()
       if err := annFo.Close(); err != nil {
           log.Fatal(err)
       }
       log.Println("Closing annFo")
     }()
-    annWriter := bufio.NewWriter(annFo)
-
     // Create index properties writer
     ixFo, err := os.Create("index.properties")
     if err != nil {
       log.Fatal(err)
     }
+    ixWriter := bufio.NewWriter(ixFo)
+
     defer func() {
+      ixWriter.Flush()
       if err := ixFo.Close(); err != nil {
           log.Fatal(err)
       }
       log.Println("Closing ixFo")
     }()
-    ixWriter := bufio.NewWriter(ixFo)
 
     fmt.Fprintf(ixWriter,"<parameters>\n<index>repo</index>\n")
     fmt.Fprintf(ixWriter,"<corpus>\n")
@@ -163,8 +175,7 @@ func main() {
       docid++
     }
     fmt.Fprintf(ixWriter,"</corpus>\n</parameters>")
-    annWriter.Flush()
-    ixWriter.Flush()
+    log.Println("Finished ix descriptor")
   }()
 
   for _, s := range il.Items {
