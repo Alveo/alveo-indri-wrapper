@@ -6,7 +6,11 @@ import (
   "bufio"
   "os"
   "path"
+  "net/http"
+  "bytes"
+  "os/exec"
   "strconv"
+  "code.google.com/p/gorest"
   "github.com/TimothyJones/hcsvlabapi"
 )
 
@@ -23,8 +27,6 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
 
     block := make(chan int,2)
     go func(item hcsvlabapi.Item) {
-//        log.Println("Recieved ",item);
-//      for _,doc := range item.Documents {
         data, err := api.Get(item.Primary_text_url)
         if err != nil {
           log.Fatal(err)
@@ -48,17 +50,17 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
         }
         log.Println(written, "bytes written to",fileName)
         w.Flush()
- //     }
       block <- 1
     }(item)
 
     go func(item hcsvlabapi.Item) {
-/*      annotations, err := api.GetAnnotations(item)
+      annotations, err := api.GetAnnotations(item)
       if err != nil {
         log.Fatal(err)
       }
       da := &documentAnnotations{fileName,&annotations}
-      annotationsProcessor <- da*/
+      //da := &documentAnnotations{fileName,nil}
+      annotationsProcessor <- da
       block <-1
     }(item)
 
@@ -77,29 +79,68 @@ type documentAnnotations struct {
   AnnotationList* hcsvlabapi.AnnotationList
 }
 
+//Service Definition
+type IndriService struct {
+  gorest.RestService `root:"/"`
+  query  gorest.EndPoint `method:"GET" path:"/query/docs/{itemList:int}/{query:string}" output:"string"`
+  queryall  gorest.EndPoint `method:"GET" path:"/query/all/{itemList:int}/{query:string}" output:"string"`
+  index    gorest.EndPoint `method:"GET" path:"/index/{itemList:int}" output:"string"`
+}
+
+func(serv IndriService) Queryall(itemList int, query string) string{
+  cmd := exec.Command("/Users/tim/office/c/snipped/example", path.Join("repos",strconv.FormatInt(int64(itemList),10)),query)
+  var out bytes.Buffer
+  cmd.Stdout = &out
+  err := cmd.Run()
+  if err != nil {
+    log.Fatal(err)
+  }
+  return out.String()
+}
+
+func(serv IndriService) Query(itemList int, query string) string{
+  cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + path.Join("repos",strconv.FormatInt(int64(itemList),10)),"-query="+query,"-count=1000")
+  var out bytes.Buffer
+  cmd.Stdout = &out
+  err := cmd.Run()
+  if err != nil {
+    log.Fatal(err)
+  }
+  serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
+  return out.String()
+}
+
+func(serv IndriService) Index(itemList int) string{
+  err := obtainAndIndex(10,itemList,"http://ic2-hcsvlab-staging2-vm.intersect.org.au/","ApysuCqJPV4zxYSpqaej")
+  if err != nil {
+    log.Fatal(err)
+  }
+  log.Println("Beginning indexing")
+  cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", "index.properties")
+  var out bytes.Buffer
+  cmd.Stdout = &out
+  err = cmd.Run()
+  if err != nil {
+    log.Fatal(err)
+  }
+  serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
+  return out.String()
+}
+
 func main() {
-  if len(os.Args) != 5 {
-    fmt.Println(os.Args[0], ": Downloads and prints to standard out all the items associated with an itemlist in the HCSvLab API")
-    fmt.Println("Usage:")
-    fmt.Println("   ",os.Args[0], " <Number of workers> <API Base URL> <API Key> <item list id>")
-    return
-  }
-  numWorkers,err := strconv.Atoi(os.Args[1])
-  if err != nil {
-    log.Fatal(err)
-  }
-  itemListId,err := strconv.Atoi(os.Args[4])
-  if err != nil {
-    log.Fatal(err)
-  }
+  gorest.RegisterService(new(IndriService)) //Register our service
+  http.Handle("/",gorest.Handle())
+  http.ListenAndServe(":8787",nil)
+}
+
+func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string) (err error){
   log.Println("Number of workers:",numWorkers)
-  api := hcsvlabapi.Api{os.Args[2],os.Args[3]}
-  
+  api := hcsvlabapi.Api{apiBase,apiKey}
   ver,err := api.GetVersion()
   if err != nil {
     log.Fatal(err)
   }
-  if ver.Api_version != "HEAD (sha1:35715bc)" {
+  if ver.Api_version != "Sprint_19_demo" {
     log.Fatal("Server API version is incorrect:",ver)
   }
 
@@ -155,22 +196,34 @@ func main() {
       log.Println("Closing ixFo")
     }()
 
-    fmt.Fprintf(ixWriter,"<parameters>\n<index>repo</index>\n")
+    fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",path.Join("repos",strconv.FormatInt(int64(itemListId),10)))
     fmt.Fprintf(ixWriter,"<corpus>\n")
-    fmt.Fprintf(ixWriter,"  <class>txt</class>\n")
+    fmt.Fprintf(ixWriter,"  <class>xml</class>\n")
     fmt.Fprintf(ixWriter,"  <annotations>annotation.offsets</annotations>\n")
+      fmt.Fprintf(ixWriter,"  <path>data</path>\n")
 
     for da := range annotationsProcessor {
-      fmt.Fprintf(ixWriter,"  <path>data/%s</path>\n",da.Filename)
       log.Println("writing annotations for",da.Filename)
 
-      for _, annotation := range da.AnnotationList.Annotations {
-        if int(annotation.End-annotation.Start) == 0 {
-          fmt.Fprintf(annWriter,"%d\tannotation\t%d\t%s\t%d\t%d\t\t0\t\n",docid,tagid,annotation.Label,int(annotation.Start),int(annotation.End-annotation.Start))
-        } else {
-          fmt.Fprintf(annWriter,"%d\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",docid,tagid,annotation.Label,int(annotation.Start),int(annotation.End-annotation.Start))
+      if da.AnnotationList != nil {
+        for _, annotation := range da.AnnotationList.Annotations {
+          aEnd,err := strconv.Atoi(annotation.End)
+          if err != nil {
+            log.Println("Unable to convert end annotation",annotation.End,"to int")
+            continue
+          }
+          aStart,err := strconv.Atoi(annotation.Start)
+          if err != nil {
+            log.Println("Unable to convert end annotation",annotation.Start,"to int")
+            continue
+          }
+          if aEnd-aStart == 0 {
+            fmt.Fprintf(annWriter,"%s\tannotation\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annotation.Label,aStart,aEnd-aStart)
+          } else {
+            fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,docid,tagid,annotation.Label,aStart,aEnd-aStart)
+          }
+          tagid++
         }
-        tagid++
       }
       docid++
     }
