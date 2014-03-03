@@ -6,7 +6,9 @@ import (
   "bufio"
   "os"
   "path"
+  "errors"
   "net/http"
+  "encoding/json"
   "bytes"
   "os/exec"
   "strconv"
@@ -14,12 +16,19 @@ import (
   "github.com/TimothyJones/hcsvlabapi"
 )
 
+type ErrorResponse struct {
+  class string `json:"type"`
+  err error
+}
+
+
 
 func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
   for r := range requests {
     item, erro := api.GetItemFromUri(r)
     if erro != nil {
-      log.Fatal(erro)
+      log.Println("Worker encountered",erro)
+      continue
     }
     log.Println(item.Catalog_url)
 
@@ -27,39 +36,46 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
 
     block := make(chan int,2)
     go func(item hcsvlabapi.Item) {
-        data, err := api.Get(item.Primary_text_url)
-        if err != nil {
-          log.Fatal(err)
+      data, err := api.Get(item.Primary_text_url)
+      if err != nil {
+        log.Println("Error obtaining item from API",err)
+        block <- 1
+        return
+      }
+      log.Println("Saving",fileName, "(",len(data),"bytes)")
+      fo, err := os.Create(path.Join("data",fileName))
+      if err != nil {
+        log.Println("Error opening file for item",err)
+        block <- 1
+        return
+      }
+      // close fo on exit and check for its returned error
+      defer func() {
+        if err := fo.Close(); err != nil {
+            log.Println("Worker couldn't close the item's file",err)
         }
-        log.Println("Saving",fileName, "(",len(data),"bytes)")
-        fo, err := os.Create(path.Join("data",fileName))
-        if err != nil {
-          log.Fatal(err)
-        }
-        // close fo on exit and check for its returned error
-        defer func() {
-          if err := fo.Close(); err != nil {
-              log.Fatal(err)
-          }
-          log.Println("Finished",fileName)
-        }()
-        w := bufio.NewWriter(fo)
-        written, err := w.Write(data)
-        if err != nil {
-          log.Fatal(err)
-        }
-        log.Println(written, "bytes written to",fileName)
-        w.Flush()
+        log.Println("Finished",fileName)
+      }()
+      w := bufio.NewWriter(fo)
+      written, err := w.Write(data)
+      if err != nil {
+        log.Println("Error writing file for item",err)
+        block <- 1
+        return
+      }
+      log.Println(written, "bytes written to",fileName)
+      w.Flush()
       block <- 1
     }(item)
 
     go func(item hcsvlabapi.Item) {
       annotations, err := api.GetAnnotations(item)
       if err != nil {
-        log.Fatal(err)
+        log.Println("Error obtaining annotations",err)
+        block <- 1
+        return
       }
       da := &documentAnnotations{fileName,&annotations}
-      //da := &documentAnnotations{fileName,nil}
       annotationsProcessor <- da
       block <-1
     }(item)
@@ -93,7 +109,13 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   cmd.Stdout = &out
   err := cmd.Run()
   if err != nil {
-    log.Fatal(err)
+    log.Println("QueryAll encountered this error:",err)
+    var response = ErrorResponse{"error",err}
+    responseString, errMars := json.Marshal(response);
+    if errMars != nil {
+      return "{type: \"error\",message: \"Cannot marshal json error\"}"
+    }
+    return string(responseString)
   }
   return out.String()
 }
@@ -104,27 +126,46 @@ func(serv IndriService) Query(itemList int, query string) string{
   cmd.Stdout = &out
   err := cmd.Run()
   if err != nil {
-    log.Fatal(err)
+    log.Println("Query encountered this error:",err)
+    var response = ErrorResponse{"error",err}
+    responseString, errMars := json.Marshal(response);
+    if errMars != nil {
+      return "{type: \"error\",message: \"Cannot marshal json error\"}"
+    }
+    return string(responseString)
   }
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   return out.String()
 }
 
 func(serv IndriService) Index(itemList int) string{
-  err := obtainAndIndex(10,itemList,"http://ic2-hcsvlab-staging2-vm.intersect.org.au/","ApysuCqJPV4zxYSpqaej")
-  if err != nil {
-    log.Fatal(err)
-  }
-  log.Println("Beginning indexing")
+  // Declare upfront because of use of goto
   cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", "index.properties")
   var out bytes.Buffer
+
+  // processing begins here
+  err := obtainAndIndex(10,itemList,"http://ic2-hcsvlab-staging2-vm.intersect.org.au/","ApysuCqJPV4zxYSpqaej")
+  if err != nil {
+    goto errHandle
+  }
+  log.Println("Beginning indexing")
   cmd.Stdout = &out
   err = cmd.Run()
   if err != nil {
-    log.Fatal(err)
+    goto errHandle
   }
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   return out.String()
+  
+  errHandle:
+
+  log.Println("Index encountered this error:",err)
+  var response = ErrorResponse{"error",err}
+  responseString, errMars := json.Marshal(response);
+  if errMars != nil {
+    return "{type: \"error\",message: \"Cannot marshal json error\"}"
+  }
+  return string(responseString)
 }
 
 func main() {
@@ -138,10 +179,11 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   api := hcsvlabapi.Api{apiBase,apiKey}
   ver,err := api.GetVersion()
   if err != nil {
-    log.Fatal(err)
+    return
   }
   if ver.Api_version != "Sprint_19_demo" {
-    log.Fatal("Server API version is incorrect:",ver)
+    err = errors.New("Server API version is incorrect:" + ver.Api_version)
+    return
   }
 
   requests := make(chan string,200)
@@ -151,7 +193,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
 
   il, err := api.GetItemList(itemListId)
   if err != nil {
-    log.Fatal(err)
+    return
   }
 
   for i := 0 ; i < numWorkers; i++ {
@@ -160,47 +202,52 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   k := 0
 
   go func() {
+    // This is the annotations processor
+    // It also writes the index file
     tagid := 1
     docid := 1
     log.Println("Starting to annotate")
+    defer func() {
+      doneWriting <- 1
+    }()
 
     // Create annotations writer
     annFo, err := os.Create("annotation.offsets")
     if err != nil {
-      log.Fatal(err)
+      log.Println("Error unable to create annotations offset file",err)
+      return
     }
-    defer func() {
-      doneWriting <- 1
-    }()
     annWriter := bufio.NewWriter(annFo)
 
     defer func() {
       annWriter.Flush()
       if err := annFo.Close(); err != nil {
-          log.Fatal(err)
+        log.Println("Error unable to close annotations offset file",err)
       }
       log.Println("Closing annFo")
     }()
+
     // Create index properties writer
     ixFo, err := os.Create("index.properties")
     if err != nil {
-      log.Fatal(err)
+      log.Println("Error unable to create index description file",err)
+      return
     }
     ixWriter := bufio.NewWriter(ixFo)
 
     defer func() {
+      log.Println("Closing ixFo")
       ixWriter.Flush()
       if err := ixFo.Close(); err != nil {
-          log.Fatal(err)
+        log.Println("Couldn't close the ixWriter",err)
       }
-      log.Println("Closing ixFo")
     }()
 
     fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",path.Join("repos",strconv.FormatInt(int64(itemListId),10)))
     fmt.Fprintf(ixWriter,"<corpus>\n")
     fmt.Fprintf(ixWriter,"  <class>xml</class>\n")
     fmt.Fprintf(ixWriter,"  <annotations>annotation.offsets</annotations>\n")
-      fmt.Fprintf(ixWriter,"  <path>data</path>\n")
+    fmt.Fprintf(ixWriter,"  <path>data</path>\n")
 
     for da := range annotationsProcessor {
       log.Println("writing annotations for",da.Filename)
