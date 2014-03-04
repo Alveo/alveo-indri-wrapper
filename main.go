@@ -126,6 +126,7 @@ type IndriService struct {
 }
 
 func(serv IndriService) Queryall(itemList int, query string) string{
+  log.Println("Query all recieved request for itemlist",itemList, " with query",query)
   cmd := exec.Command("/Users/tim/office/c/snipped/example", path.Join("repos",strconv.FormatInt(int64(itemList),10)),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
@@ -134,7 +135,9 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     log.Println("QueryAll encountered this error:",err)
     return stringError(err)
   }
-  scanner := bufio.NewScanner(out)
+
+  // read from the string from the buffer, becasue the out buffer contains no EOF
+  scanner := bufio.NewScanner(bytes.NewBufferString(out.String()))
 
   state := 1
 
@@ -165,6 +168,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
       match = scanner.Text()
       item := &MatchItem{docId,location,match}
       res.Matches = append(res.Matches,item)
+      log.Println("Match complete",item)
 
       location = 0
       docId = ""
@@ -175,8 +179,11 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   if err := scanner.Err(); err != nil {
     return stringError(err)
   }
-
-  return out.String()
+  result, errMars := json.Marshal(res);
+  if errMars != nil {
+    return "{type: \"error\",message: \"Cannot marshal json response\"}"
+  }
+  return string(result)
 }
 
 func(serv IndriService) Query(itemList int, query string) string{
@@ -230,7 +237,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   if err != nil {
     return
   }
-  if ver.Api_version != "Sprint_19_demo" {
+  if ver.Api_version != "Sprint_20_demo" {
     err = errors.New("Server API version is incorrect:" + ver.Api_version)
     return
   }
