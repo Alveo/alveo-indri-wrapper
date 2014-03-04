@@ -21,6 +21,15 @@ type ErrorResponse struct {
   err error
 }
 
+func stringError(err error) (string) {
+  var response = ErrorResponse{"error",err}
+  result, errMars := json.Marshal(response);
+  if errMars != nil {
+    return "{type: \"error\",message: \"Cannot marshal json error\"}"
+  }
+  return string(result)
+}
+
 
 
 func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
@@ -110,12 +119,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   err := cmd.Run()
   if err != nil {
     log.Println("QueryAll encountered this error:",err)
-    var response = ErrorResponse{"error",err}
-    responseString, errMars := json.Marshal(response);
-    if errMars != nil {
-      return "{type: \"error\",message: \"Cannot marshal json error\"}"
-    }
-    return string(responseString)
+    return stringError(err)
   }
   return out.String()
 }
@@ -127,12 +131,7 @@ func(serv IndriService) Query(itemList int, query string) string{
   err := cmd.Run()
   if err != nil {
     log.Println("Query encountered this error:",err)
-    var response = ErrorResponse{"error",err}
-    responseString, errMars := json.Marshal(response);
-    if errMars != nil {
-      return "{type: \"error\",message: \"Cannot marshal json error\"}"
-    }
-    return string(responseString)
+    return stringError(err)
   }
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   return out.String()
@@ -160,12 +159,7 @@ func(serv IndriService) Index(itemList int) string{
   errHandle:
 
   log.Println("Index encountered this error:",err)
-  var response = ErrorResponse{"error",err}
-  responseString, errMars := json.Marshal(response);
-  if errMars != nil {
-    return "{type: \"error\",message: \"Cannot marshal json error\"}"
-  }
-  return string(responseString)
+  return stringError(err)
 }
 
 func main() {
