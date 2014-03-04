@@ -183,6 +183,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   if errMars != nil {
     return "{type: \"error\",message: \"Cannot marshal json response\"}"
   }
+  serv.ResponseBuilder().SetContentType("text/json; charset=\"utf-8\"")
   return string(result)
 }
 
