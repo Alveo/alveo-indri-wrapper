@@ -17,12 +17,25 @@ import (
 )
 
 type ErrorResponse struct {
-  class string `json:"type"`
-  err error
+  Class string `json:"type"`
+  Err string `json:"error"`
 }
 
+type MatchItem struct {
+  DocId string `json:"docid"`
+  Location int64 `json:"location"`
+  Match string `json:"match"`
+}
+
+type AllQueryResult struct {
+  Class string `json:"type"`
+  Matches []*MatchItem
+}
+
+
+
 func stringError(err error) (string) {
-  var response = ErrorResponse{"error",err}
+  var response = ErrorResponse{"error",err.Error()}
   result, errMars := json.Marshal(response);
   if errMars != nil {
     return "{type: \"error\",message: \"Cannot marshal json error\"}"
@@ -114,13 +127,55 @@ type IndriService struct {
 
 func(serv IndriService) Queryall(itemList int, query string) string{
   cmd := exec.Command("/Users/tim/office/c/snipped/example", path.Join("repos",strconv.FormatInt(int64(itemList),10)),query)
-  var out bytes.Buffer
-  cmd.Stdout = &out
+  out := bytes.NewBuffer(nil)
+  cmd.Stdout = out
   err := cmd.Run()
   if err != nil {
     log.Println("QueryAll encountered this error:",err)
     return stringError(err)
   }
+  scanner := bufio.NewScanner(out)
+
+  state := 1
+
+  var location int64
+  location = 0
+  docId := ""
+  match := ""
+
+  var res AllQueryResult
+
+  res.Class = "result"
+  res.Matches = make([]*MatchItem, 0, 1000)
+
+  for scanner.Scan() {
+    // 1st docid
+    // 2nd position
+    // 3rd match
+    if state == 1 {
+      docId = scanner.Text()
+      state = 2
+    } else if state == 2 {
+      location, err = strconv.ParseInt(scanner.Text(),10,64)
+      if err != nil {
+        log.Println("Couldn't parse location in result")
+      }
+      state = 3
+    } else if state == 3 {
+      match = scanner.Text()
+      item := &MatchItem{docId,location,match}
+      res.Matches = append(res.Matches,item)
+
+      location = 0
+      docId = ""
+      match = ""
+      state = 1
+    }
+  }
+  if err := scanner.Err(); err != nil {
+    return stringError(err)
+  }
+
   return out.String()
 }
 
