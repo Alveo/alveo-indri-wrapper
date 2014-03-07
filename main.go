@@ -7,6 +7,7 @@ import (
   "os"
   "path"
   "errors"
+  "strings"
   "net/http"
   "encoding/json"
   "bytes"
@@ -20,6 +21,14 @@ type ErrorResponse struct {
   Class string `json:"type"`
   Err string `json:"error"`
 }
+type AllQueryResult struct {
+  Class string `json:"type"`
+  Matches []*MatchItem
+}
+type DocQueryResult struct {
+  Class string `json:"type"`
+  Matches []*MatchDoc
+}
 
 type MatchItem struct {
   DocId string `json:"docid"`
@@ -27,11 +36,11 @@ type MatchItem struct {
   Match string `json:"match"`
 }
 
-type AllQueryResult struct {
-  Class string `json:"type"`
-  Matches []*MatchItem
+type MatchDoc struct {
+  DocId string `json:"docid"`
+  Start int64 `json:"start"`
+  End int64 `json:"end"`
 }
-
 
 
 func stringError(err error) (string) {
@@ -42,8 +51,6 @@ func stringError(err error) (string) {
   }
   return string(result)
 }
-
-
 
 func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
   for r := range requests {
@@ -183,12 +190,14 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   if errMars != nil {
     return "{type: \"error\",message: \"Cannot marshal json response\"}"
   }
-  serv.ResponseBuilder().SetContentType("text/json; charset=\"utf-8\"")
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   return string(result)
 }
 
 func(serv IndriService) Query(itemList int, query string) string{
   cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + path.Join("repos",strconv.FormatInt(int64(itemList),10)),"-query="+query,"-count=1000")
+  log.Println("Query for doc matches received:",query)
   var out bytes.Buffer
   cmd.Stdout = &out
   err := cmd.Run()
@@ -196,8 +205,37 @@ func(serv IndriService) Query(itemList int, query string) string{
     log.Println("Query encountered this error:",err)
     return stringError(err)
   }
-  serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
-  return out.String()
+  scanner := bufio.NewScanner(bytes.NewBufferString(out.String()))
+
+  var res DocQueryResult
+
+  res.Class = "result"
+  res.Matches = make([]*MatchDoc, 0, 1000)
+
+  for scanner.Scan() {
+    A := strings.Split(scanner.Text(),"\t")
+    if len(A) != 4 {
+      log.Println("Error: response contains less than four fields")
+    } else {
+      start, err := strconv.ParseInt(A[2],10,64)
+      if err != nil {
+        log.Println("Couldn't parse start in result")
+      }
+      end, err := strconv.ParseInt(A[3],10,64)
+      if err != nil {
+        log.Println("Couldn't parse end in result")
+      }
+      match := &MatchDoc{A[1],start,end}
+      res.Matches = append(res.Matches,match)
+    }
+  }
+  result, errMars := json.Marshal(res);
+  if errMars != nil {
+    return "{type: \"error\",message: \"Cannot marshal json response\"}"
+  }
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+  return string(result)
 }
 
 func(serv IndriService) Index(itemList int) string{
