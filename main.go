@@ -61,7 +61,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
     }
     log.Println(item.Catalog_url)
 
-    fileName := item.Metadata["dc:identifier"]
+    fileName := item.Metadata["hcsvlab:handle"]
 
     block := make(chan int,2)
     go func(item hcsvlabapi.Item) {
@@ -127,7 +127,7 @@ type documentAnnotations struct {
 //Service Definition
 type IndriService struct {
   gorest.RestService `root:"/"`
-  query  gorest.EndPoint `method:"GET" path:"/query/docs/{itemList:int}/{query:string}" output:"string"`
+  query  gorest.EndPoint `method:"GET" path:"/query/doc/{itemList:int}/{query:string}" output:"string"`
   queryall  gorest.EndPoint `method:"GET" path:"/query/all/{itemList:int}/{query:string}" output:"string"`
   index    gorest.EndPoint `method:"GET" path:"/index/{itemList:int}" output:"string"`
 }
@@ -155,7 +155,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
 
   var res AllQueryResult
 
-  res.Class = "result"
+  res.Class = "result-all"
   res.Matches = make([]*MatchItem, 0, 1000)
 
   for scanner.Scan() {
@@ -209,7 +209,7 @@ func(serv IndriService) Query(itemList int, query string) string{
 
   var res DocQueryResult
 
-  res.Class = "result"
+  res.Class = "result-doc"
   res.Matches = make([]*MatchDoc, 0, 1000)
 
   for scanner.Scan() {
@@ -241,6 +241,8 @@ func(serv IndriService) Query(itemList int, query string) string{
 func(serv IndriService) Index(itemList int) string{
   // Declare upfront because of use of goto
   cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", "index.properties")
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   var out bytes.Buffer
 
   // processing begins here
@@ -254,7 +256,7 @@ func(serv IndriService) Index(itemList int) string{
   if err != nil {
     goto errHandle
   }
-  serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
+  log.Println("Indexing complete")
   return out.String()
   
   errHandle:
@@ -276,7 +278,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   if err != nil {
     return
   }
-  if ver.Api_version != "Sprint_20_demo" {
+  if ver.Api_version != "Sprint_21_demo" {
     err = errors.New("Server API version is incorrect:" + ver.Api_version)
     return
   }
