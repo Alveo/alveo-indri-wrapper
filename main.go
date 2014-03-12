@@ -134,6 +134,8 @@ type IndriService struct {
 
 func(serv IndriService) Queryall(itemList int, query string) string{
   log.Println("Query all recieved request for itemlist",itemList, " with query",query)
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   cmd := exec.Command("/Users/tim/office/c/snipped/example", path.Join("repos",strconv.FormatInt(int64(itemList),10)),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
@@ -190,14 +192,14 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   if errMars != nil {
     return "{type: \"error\",message: \"Cannot marshal json response\"}"
   }
-  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
-  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   return string(result)
 }
 
 func(serv IndriService) Query(itemList int, query string) string{
-  cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + path.Join("repos",strconv.FormatInt(int64(itemList),10)),"-query="+query,"-count=1000")
   log.Println("Query for doc matches received:",query)
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+  cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + path.Join("repos",strconv.FormatInt(int64(itemList),10)),"-query="+query,"-count=1000")
   var out bytes.Buffer
   cmd.Stdout = &out
   err := cmd.Run()
@@ -233,16 +235,15 @@ func(serv IndriService) Query(itemList int, query string) string{
   if errMars != nil {
     return "{type: \"error\",message: \"Cannot marshal json response\"}"
   }
-  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
-  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   return string(result)
 }
 
 func(serv IndriService) Index(itemList int) string{
-  // Declare upfront because of use of goto
-  cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", "index.properties")
+  log.Println("Request to index itemList",itemList)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
+  // Declare upfront because of use of goto
+  cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", "index.properties")
   var out bytes.Buffer
 
   // processing begins here
