@@ -8,6 +8,7 @@ import (
   "path"
   "errors"
   "strings"
+  "sync"
   "net/http"
   "encoding/json"
   "bytes"
@@ -44,6 +45,8 @@ type MatchDoc struct {
   End int64 `json:"end"`
 }
 
+var itemListsInProgress map[int]int
+var progressMutex sync.Mutex
 
 func stringError(err error) (string) {
   var response = ErrorResponse{"error",err.Error()}
@@ -283,11 +286,29 @@ func(serv IndriService) Index(itemList int) string{
 
 func main() {
   gorest.RegisterService(new(IndriService)) //Register our service
+  itemListsInProgress = make(map[int]int)
   http.Handle("/",gorest.Handle())
   http.ListenAndServe(":8787",nil)
 }
 
 func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string) (err error){
+  log.Println("Checking itemlists to see if",itemListId, "is in progress")
+
+  progressMutex.Lock()
+  if itemListsInProgress[itemListId] != 0 {
+    log.Println("Indexing already in progress")
+    err = errors.New("Itemlist is already being indexed. Please wait for the indexing to complete")
+    return
+  }
+  defer func() {
+    progressMutex.Lock()
+    itemListsInProgress[itemListId] = 0
+    progressMutex.Unlock()
+  }()
+  itemListsInProgress[itemListId] = 1
+  progressMutex.Unlock()
+
+
   log.Println("Indexing itemlist",itemListId,"with number of workers:",numWorkers)
   api := hcsvlabapi.Api{apiBase,apiKey}
   ver,err := api.GetVersion()
