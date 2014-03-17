@@ -21,10 +21,12 @@ type ErrorResponse struct {
   Class string `json:"type"`
   Err string `json:"error"`
 }
+
 type AllQueryResult struct {
   Class string `json:"type"`
   Matches []*MatchItem
 }
+
 type DocQueryResult struct {
   Class string `json:"type"`
   Matches []*MatchDoc
@@ -52,7 +54,7 @@ func stringError(err error) (string) {
   return string(result)
 }
 
-func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations) {
+func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListUtil *ItemListHelper) {
   for r := range requests {
     item, erro := api.GetItemFromUri(r)
     if erro != nil {
@@ -72,7 +74,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
         return
       }
       log.Println("Saving",fileName, "(",len(data),"bytes)")
-      fo, err := os.Create(path.Join("data",fileName))
+      fo, err := os.Create(path.Join(itemListUtil.DataLocation(),fileName))
       if err != nil {
         log.Println("Error opening file for item",err)
         block <- 1
@@ -134,9 +136,10 @@ type IndriService struct {
 
 func(serv IndriService) Queryall(itemList int, query string) string{
   log.Println("Query all recieved request for itemlist",itemList, " with query",query)
+  itemListUtil := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
-  cmd := exec.Command("/Users/tim/office/c/snipped/example", path.Join("repos",strconv.FormatInt(int64(itemList),10)),query)
+  cmd := exec.Command("/Users/tim/office/c/snipped/example", itemListUtil.RepoLocation(),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
   err := cmd.Run()
@@ -197,9 +200,10 @@ func(serv IndriService) Queryall(itemList int, query string) string{
 
 func(serv IndriService) Query(itemList int, query string) string{
   log.Println("Query for doc matches received:",query)
+  itemListUtil := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
-  cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + path.Join("repos",strconv.FormatInt(int64(itemList),10)),"-query="+query,"-count=1000")
+  cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + itemListUtil.RepoLocation(),"-query="+query,"-count=1000")
   var out bytes.Buffer
   cmd.Stdout = &out
   err := cmd.Run()
@@ -240,6 +244,7 @@ func(serv IndriService) Query(itemList int, query string) string{
 
 func(serv IndriService) Index(itemList int) string{
   log.Println("Request to index itemList",itemList)
+  itemListUtil := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   // Declare upfront because of use of goto
@@ -251,6 +256,13 @@ func(serv IndriService) Index(itemList int) string{
   if err != nil {
     goto errHandle
   }
+
+  log.Println("Removing old index")
+  err = itemListUtil.RemoveRepo()
+  if err != nil {
+    goto errHandle
+  }
+
   log.Println("Beginning indexing")
   cmd.Stdout = &out
   err = cmd.Run()
@@ -273,12 +285,13 @@ func main() {
 }
 
 func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string) (err error){
-  log.Println("Number of workers:",numWorkers)
+  log.Println("Indexing itemlist",itemListId,"with number of workers:",numWorkers)
   api := hcsvlabapi.Api{apiBase,apiKey}
   ver,err := api.GetVersion()
   if err != nil {
     return
   }
+
   if ver.Api_version != "Sprint_21_demo" {
     err = errors.New("Server API version is incorrect:" + ver.Api_version)
     return
@@ -294,8 +307,16 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     return
   }
 
+  itemListUtil := &ItemListHelper{itemListId}
+
+  itemListUtil.RemoveData()
+  err = itemListUtil.MkdirData()
+  if err != nil {
+    return
+  }
+
   for i := 0 ; i < numWorkers; i++ {
-    go worker(api,requests,block,annotationsProcessor)
+    go worker(api,requests,block,annotationsProcessor,itemListUtil)
   }
   k := 0
 
@@ -341,11 +362,11 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
       }
     }()
 
-    fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",path.Join("repos",strconv.FormatInt(int64(itemListId),10)))
+    fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",itemListUtil.RepoLocation())
     fmt.Fprintf(ixWriter,"<corpus>\n")
     fmt.Fprintf(ixWriter,"  <class>xml</class>\n")
     fmt.Fprintf(ixWriter,"  <annotations>annotation.offsets</annotations>\n")
-    fmt.Fprintf(ixWriter,"  <path>data</path>\n")
+    fmt.Fprintf(ixWriter,"  <path>%s</path>\n",itemListUtil.DataLocation())
 
     for da := range annotationsProcessor {
       log.Println("writing annotations for",da.Filename)
