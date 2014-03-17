@@ -148,6 +148,9 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     return stringError(err)
   }
 
+  if strings.TrimSpace(query) == "" {
+    return stringError(errors.New("Empty query"))
+  }
   // read from the string from the buffer, becasue the out buffer contains no EOF
   scanner := bufio.NewScanner(bytes.NewBufferString(out.String()))
 
