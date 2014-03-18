@@ -34,7 +34,7 @@ func (il *ItemListHelper) RemoveData() (err error) {
 
 // Creates the data directory for this collection
 func (il *ItemListHelper) MkdirData() (err error) {
-  err = os.MkdirAll(il.DataLocation(),os.ModeDir)
+  err = os.MkdirAll(il.DataLocation(),os.ModeDir | 0755)
   return
 }
 
