@@ -39,4 +39,12 @@ func (il *ItemListHelper) MkdirData() (err error) {
 }
 
 
+func (il *ItemListHelper) MakeReadyForDownload() (err error) {
+  err = il.RemoveData()
+  if err != nil {
+    return
+  }
+  err = il.MkdirData()
+  return
+}
 

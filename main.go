@@ -335,8 +335,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
 
   itemListUtil := &ItemListHelper{itemListId}
 
-  itemListUtil.RemoveData()
-  err = itemListUtil.MkdirData()
+  err = itemListUtil.MakeReadyForDownload()
   if err != nil {
     return
   }
