@@ -142,6 +142,11 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   itemListUtil := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+
+  if strings.TrimSpace(query) == "" {
+    return stringError(errors.New("Empty query"))
+  }
+
   cmd := exec.Command("/Users/tim/office/c/snipped/example", itemListUtil.RepoLocation(),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
@@ -151,9 +156,6 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     return stringError(err)
   }
 
-  if strings.TrimSpace(query) == "" {
-    return stringError(errors.New("Empty query"))
-  }
   // read from the string from the buffer, becasue the out buffer contains no EOF
   scanner := bufio.NewScanner(bytes.NewBufferString(out.String()))
 
