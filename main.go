@@ -69,7 +69,7 @@ func stringError(err error) (string) {
   return string(result)
 }
 
-func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListUtil *ItemListHelper) {
+func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListHelper *ItemListHelper) {
   for r := range requests {
     item, erro := api.GetItemFromUri(r)
     if erro != nil {
@@ -89,7 +89,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
         return
       }
       log.Println("Saving",fileName, "(",len(data),"bytes)")
-      fo, err := os.Create(path.Join(itemListUtil.DataLocation(),fileName))
+      fo, err := os.Create(path.Join(itemListHelper.DataLocation(),fileName))
       if err != nil {
         log.Println("Error opening file for item",err)
         block <- 1
@@ -151,7 +151,7 @@ type IndriService struct {
 
 func(serv IndriService) Queryall(itemList int, query string) string{
   log.Println("Query all recieved request for itemlist",itemList, " with query",query)
-  itemListUtil := &ItemListHelper{itemList}
+  itemListHelper := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
@@ -159,12 +159,12 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     return stringError(errors.New("Empty query"))
   }
 
-  indexCreatedTime, err := itemListUtil.CreatedTime()
+  indexCreatedTime, err := itemListHelper.CreatedTime()
   if err != nil {
     return stringError(err)
   }
 
-  cmd := exec.Command(config.Binaries.QueryAll, itemListUtil.RepoLocation(),query)
+  cmd := exec.Command(config.Binaries.QueryAll, itemListHelper.RepoLocation(),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
   err = cmd.Run()
@@ -194,7 +194,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     // 2nd position
     // 3rd match
     if state == 1 {
-      docId = itemListUtil.docIdForFile(scanner.Text())
+      docId = itemListHelper.docIdForFile(scanner.Text())
       state = 2
     } else if state == 2 {
       location, err = strconv.ParseInt(scanner.Text(),10,64)
@@ -226,16 +226,16 @@ func(serv IndriService) Queryall(itemList int, query string) string{
 
 func(serv IndriService) Query(itemList int, query string) string{
   log.Println("Query for doc matches received:",query)
-  itemListUtil := &ItemListHelper{itemList}
+  itemListHelper := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
-  indexCreatedTime, err := itemListUtil.CreatedTime()
+  indexCreatedTime, err := itemListHelper.CreatedTime()
   if err != nil {
     return stringError(err)
   }
 
-  cmd := exec.Command(config.Binaries.IndriRunQuery, "-index=" + itemListUtil.RepoLocation(),"-query="+query,"-count=1000")
+  cmd := exec.Command(config.Binaries.IndriRunQuery, "-index=" + itemListHelper.RepoLocation(),"-query="+query,"-count=1000")
   var out bytes.Buffer
   cmd.Stdout = &out
   err = cmd.Run()
@@ -264,7 +264,7 @@ func(serv IndriService) Query(itemList int, query string) string{
       if err != nil {
         log.Println("Couldn't parse end in result")
       }
-      docId := itemListUtil.docIdForFile(A[1])
+      docId := itemListHelper.docIdForFile(A[1])
       match := &MatchDoc{docId,getUrlForDocId(docId),start,end}
       res.Matches = append(res.Matches,match)
     }
@@ -278,11 +278,11 @@ func(serv IndriService) Query(itemList int, query string) string{
 
 func(serv IndriService) Index(itemList int) string{
   log.Println("Request to index itemList",itemList)
-  itemListUtil := &ItemListHelper{itemList}
+  itemListHelper := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   // Declare upfront because of use of goto
-  cmd := exec.Command(config.Binaries.IndriBuildIndex, path.Join(itemListUtil.ConfigLocation(),"index.properties"))
+  cmd := exec.Command(config.Binaries.IndriBuildIndex, path.Join(itemListHelper.ConfigLocation(),"index.properties"))
   var out bytes.Buffer
 
   // processing begins here
@@ -292,7 +292,7 @@ func(serv IndriService) Index(itemList int) string{
   }
 
   log.Println("Removing old index")
-  err = itemListUtil.RemoveRepo()
+  err = itemListHelper.RemoveRepo()
   if err != nil {
     goto errHandle
   }
@@ -304,7 +304,7 @@ func(serv IndriService) Index(itemList int) string{
     goto errHandle
   }
   log.Println("Removing data")
-  err = itemListUtil.RemoveData()
+  err = itemListHelper.RemoveData()
   if err != nil {
     goto errHandle
   }
@@ -375,15 +375,15 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     return
   }
 
-  itemListUtil := &ItemListHelper{itemListId}
+  itemListHelper := &ItemListHelper{itemListId}
 
-  err = itemListUtil.MakeReadyForDownload()
+  err = itemListHelper.MakeReadyForDownload()
   if err != nil {
     return
   }
 
   for i := 0 ; i < numWorkers; i++ {
-    go worker(api,requests,block,annotationsProcessor,itemListUtil)
+    go worker(api,requests,block,annotationsProcessor,itemListHelper)
   }
   k := 0
 
@@ -398,7 +398,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     }()
 
     // Create annotations writer
-    annFo, err := os.Create(path.Join(itemListUtil.ConfigLocation(),"annotation.offsets"))
+    annFo, err := os.Create(path.Join(itemListHelper.ConfigLocation(),"annotation.offsets"))
     if err != nil {
       log.Println("Error unable to create annotations offset file",err)
       return
@@ -414,7 +414,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     }()
 
     // Create index properties writer
-    ixFo, err := os.Create(path.Join(itemListUtil.ConfigLocation(),"index.properties"))
+    ixFo, err := os.Create(path.Join(itemListHelper.ConfigLocation(),"index.properties"))
     if err != nil {
       log.Println("Error unable to create index description file",err)
       return
@@ -429,11 +429,11 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
       }
     }()
 
-    fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",itemListUtil.RepoLocation())
+    fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",itemListHelper.RepoLocation())
     fmt.Fprintf(ixWriter,"<corpus>\n")
     fmt.Fprintf(ixWriter,"  <class>xml</class>\n")
-    fmt.Fprintf(ixWriter,"  <annotations>%s</annotations>\n",path.Join(itemListUtil.ConfigLocation(),"annotation.offsets"))
-    fmt.Fprintf(ixWriter,"  <path>%s</path>\n",itemListUtil.DataLocation())
+    fmt.Fprintf(ixWriter,"  <annotations>%s</annotations>\n",path.Join(itemListHelper.ConfigLocation(),"annotation.offsets"))
+    fmt.Fprintf(ixWriter,"  <path>%s</path>\n",itemListHelper.DataLocation())
 
     for da := range annotationsProcessor {
       log.Println("writing annotations for",da.Filename)
