@@ -35,18 +35,30 @@ type DocQueryResult struct {
 
 type MatchItem struct {
   DocId string `json:"docid"`
+  Url string `json:"url"`
   Location int64 `json:"location"`
   Match string `json:"match"`
 }
 
 type MatchDoc struct {
   DocId string `json:"docid"`
+  Url string `json:"url"`
   Start int64 `json:"start"`
   End int64 `json:"end"`
 }
 
 var itemListsInProgress map[int]int
 var progressMutex sync.Mutex
+
+// todo: replace these with a config file
+const (
+  ApiLocation = "http://ic2-hcsvlab-staging2-vm.intersect.org.au/"
+)
+
+func getUrlForDocId(docId string) string {
+  return ApiLocation + "/catalog/" + docId
+}
+
 
 func stringError(err error) (string) {
   var response = ErrorResponse{"error",err.Error()}
@@ -176,7 +188,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     // 2nd position
     // 3rd match
     if state == 1 {
-      docId = scanner.Text()
+      docId = itemListUtil.docIdForFile(scanner.Text())
       state = 2
     } else if state == 2 {
       location, err = strconv.ParseInt(scanner.Text(),10,64)
@@ -186,7 +198,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
       state = 3
     } else if state == 3 {
       match = scanner.Text()
-      item := &MatchItem{docId,location,match}
+      item := &MatchItem{docId,getUrlForDocId(docId),location,match}
       res.Matches = append(res.Matches,item)
       log.Println("Match complete",item)
 
@@ -239,7 +251,8 @@ func(serv IndriService) Query(itemList int, query string) string{
       if err != nil {
         log.Println("Couldn't parse end in result")
       }
-      match := &MatchDoc{A[1],start,end}
+      docId := itemListUtil.docIdForFile(A[1])
+      match := &MatchDoc{docId,getUrlForDocId(docId),start,end}
       res.Matches = append(res.Matches,match)
     }
   }
@@ -256,11 +269,11 @@ func(serv IndriService) Index(itemList int) string{
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   // Declare upfront because of use of goto
-  cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", "index.properties")
+  cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", path.Join(itemListUtil.ConfigLocation(),"index.properties"))
   var out bytes.Buffer
 
   // processing begins here
-  err := obtainAndIndex(10,itemList,"http://ic2-hcsvlab-staging2-vm.intersect.org.au/","ApysuCqJPV4zxYSpqaej")
+  err := obtainAndIndex(10,itemList,ApiLocation,"ApysuCqJPV4zxYSpqaej")
   if err != nil {
     goto errHandle
   }
@@ -277,7 +290,15 @@ func(serv IndriService) Index(itemList int) string{
   if err != nil {
     goto errHandle
   }
+  log.Println("Removing data")
+  err = itemListUtil.RemoveData()
+  if err != nil {
+    goto errHandle
+  }
   log.Println("Indexing complete")
+
+
+
   return out.String()
   
   errHandle:
@@ -356,7 +377,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     }()
 
     // Create annotations writer
-    annFo, err := os.Create("annotation.offsets")
+    annFo, err := os.Create(path.Join(itemListUtil.ConfigLocation(),"annotation.offsets"))
     if err != nil {
       log.Println("Error unable to create annotations offset file",err)
       return
@@ -372,7 +393,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     }()
 
     // Create index properties writer
-    ixFo, err := os.Create("index.properties")
+    ixFo, err := os.Create(path.Join(itemListUtil.ConfigLocation(),"index.properties"))
     if err != nil {
       log.Println("Error unable to create index description file",err)
       return
@@ -390,7 +411,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     fmt.Fprintf(ixWriter,"<parameters>\n<index>%s</index>\n",itemListUtil.RepoLocation())
     fmt.Fprintf(ixWriter,"<corpus>\n")
     fmt.Fprintf(ixWriter,"  <class>xml</class>\n")
-    fmt.Fprintf(ixWriter,"  <annotations>annotation.offsets</annotations>\n")
+    fmt.Fprintf(ixWriter,"  <annotations>%s</annotations>\n",path.Join(itemListUtil.ConfigLocation(),"annotation.offsets"))
     fmt.Fprintf(ixWriter,"  <path>%s</path>\n",itemListUtil.DataLocation())
 
     for da := range annotationsProcessor {
