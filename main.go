@@ -49,16 +49,14 @@ type MatchDoc struct {
   End int64 `json:"end"`
 }
 
-var itemListsInProgress map[int]int
-var progressMutex sync.Mutex
-
-// todo: replace these with a config file
-const (
-  ApiLocation = "http://ic2-hcsvlab-staging2-vm.intersect.org.au/"
+var (
+ itemListsInProgress map[int]int
+ progressMutex sync.Mutex
+ config Config
 )
 
 func getUrlForDocId(docId string) string {
-  return ApiLocation + "/catalog/" + docId
+  return config.ApiPath + "/catalog/" + docId
 }
 
 
@@ -166,7 +164,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     return stringError(err)
   }
 
-  cmd := exec.Command("/Users/tim/office/c/snipped/example", itemListUtil.RepoLocation(),query)
+  cmd := exec.Command(config.Binaries.QueryAll, itemListUtil.RepoLocation(),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
   err = cmd.Run()
@@ -237,7 +235,7 @@ func(serv IndriService) Query(itemList int, query string) string{
     return stringError(err)
   }
 
-  cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + itemListUtil.RepoLocation(),"-query="+query,"-count=1000")
+  cmd := exec.Command(config.Binaries.IndriRunQuery, "-index=" + itemListUtil.RepoLocation(),"-query="+query,"-count=1000")
   var out bytes.Buffer
   cmd.Stdout = &out
   err = cmd.Run()
@@ -284,11 +282,11 @@ func(serv IndriService) Index(itemList int) string{
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
   // Declare upfront because of use of goto
-  cmd := exec.Command("/Users/tim/indri-5.6/buildindex/IndriBuildIndex", path.Join(itemListUtil.ConfigLocation(),"index.properties"))
+  cmd := exec.Command(config.Binaries.IndriBuildIndex, path.Join(itemListUtil.ConfigLocation(),"index.properties"))
   var out bytes.Buffer
 
   // processing begins here
-  err := obtainAndIndex(10,itemList,ApiLocation,"ApysuCqJPV4zxYSpqaej")
+  err := obtainAndIndex(10,itemList,config.ApiPath,config.ApiKey)
   if err != nil {
     goto errHandle
   }
@@ -323,6 +321,14 @@ func(serv IndriService) Index(itemList int) string{
 }
 
 func main() {
+  var err error
+  config, err = ReadConfig()
+  if err != nil {
+    fmt.Println("Unable to read config file, not starting.")
+    fmt.Println("Error:",err)
+    return
+  }
+  fmt.Println(config)
   gorest.RegisterService(new(IndriService)) //Register our service
   itemListsInProgress = make(map[int]int)
   http.Handle("/",gorest.Handle())
