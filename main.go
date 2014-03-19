@@ -25,11 +25,13 @@ type ErrorResponse struct {
 
 type AllQueryResult struct {
   Class string `json:"type"`
+  IndexCreatedTime string `json:"index_created_time"`
   Matches []*MatchItem
 }
 
 type DocQueryResult struct {
   Class string `json:"type"`
+  IndexCreatedTime string `json:"index_created_time"`
   Matches []*MatchDoc
 }
 
@@ -159,10 +161,15 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     return stringError(errors.New("Empty query"))
   }
 
+  indexCreatedTime, err := itemListUtil.CreatedTime()
+  if err != nil {
+    return stringError(err)
+  }
+
   cmd := exec.Command("/Users/tim/office/c/snipped/example", itemListUtil.RepoLocation(),query)
   out := bytes.NewBuffer(nil)
   cmd.Stdout = out
-  err := cmd.Run()
+  err = cmd.Run()
   if err != nil {
     log.Println("QueryAll encountered this error:",err)
     return stringError(err)
@@ -182,6 +189,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
 
   res.Class = "result-all"
   res.Matches = make([]*MatchItem, 0, 1000)
+  res.IndexCreatedTime = indexCreatedTime
 
   for scanner.Scan() {
     // 1st docid
@@ -223,10 +231,16 @@ func(serv IndriService) Query(itemList int, query string) string{
   itemListUtil := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+
+  indexCreatedTime, err := itemListUtil.CreatedTime()
+  if err != nil {
+    return stringError(err)
+  }
+
   cmd := exec.Command("/Users/tim/indri-5.6/runquery/IndriRunQuery", "-index=" + itemListUtil.RepoLocation(),"-query="+query,"-count=1000")
   var out bytes.Buffer
   cmd.Stdout = &out
-  err := cmd.Run()
+  err = cmd.Run()
   if err != nil {
     log.Println("Query encountered this error:",err)
     return stringError(err)
@@ -237,6 +251,7 @@ func(serv IndriService) Query(itemList int, query string) string{
 
   res.Class = "result-doc"
   res.Matches = make([]*MatchDoc, 0, 1000)
+  res.IndexCreatedTime = indexCreatedTime
 
   for scanner.Scan() {
     A := strings.Split(scanner.Text(),"\t")

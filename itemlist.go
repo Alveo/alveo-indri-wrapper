@@ -2,6 +2,7 @@ package main
 
 import (
   "path"
+  "errors"
   "strings"
   "strconv"
   "os"
@@ -56,6 +57,17 @@ func (il *ItemListHelper) MkdirConfig() (err error) {
   return
 }
 
+
+func (il *ItemListHelper) CreatedTime() (time string,err error) {
+  fi, err := os.Lstat(path.Join(il.RepoLocation(),"manifest"))
+  if err != nil {
+    err = errors.New("No index found for this itemlist")
+    return
+  }
+
+  time = fi.ModTime().Format("Jan 2, 2006 at 3:04pm (MST)")
+  return
+}
 
 func (il *ItemListHelper) docIdForFile(filename string) string {
   return strings.TrimPrefix(filename,path.Join(il.DataLocation()))[1:]
