@@ -73,43 +73,39 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
   for r := range requests {
     item, erro := api.GetItemFromUri(r)
     if erro != nil {
-      log.Println("Worker encountered",erro)
+      log.Println("Error: Worker encountered",erro)
       continue
     }
-    log.Println(item.Catalog_url)
-
     fileName := item.Metadata["hcsvlab:handle"]
 
     block := make(chan int,2)
     go func(item hcsvlabapi.Item) {
       data, err := api.Get(item.Primary_text_url)
       if err != nil {
-        log.Println("Error obtaining item from API",err)
+        log.Println("Error: obtaining item from API",err)
         block <- 1
         return
       }
-      log.Println("Saving",fileName, "(",len(data),"bytes)")
+      log.Println("Progress: Saving",fileName, "(",len(data),"bytes)")
       fo, err := os.Create(path.Join(itemListHelper.DataLocation(),fileName))
       if err != nil {
-        log.Println("Error opening file for item",err)
+        log.Println("Error: opening file for item",err)
         block <- 1
         return
       }
       // close fo on exit and check for its returned error
       defer func() {
         if err := fo.Close(); err != nil {
-            log.Println("Worker couldn't close the item's file",err)
+          log.Println("Error: Worker couldn't close the item's file",err)
         }
-        log.Println("Finished",fileName)
       }()
       w := bufio.NewWriter(fo)
-      written, err := w.Write(data)
+      _, err = w.Write(data)
       if err != nil {
-        log.Println("Error writing file for item",err)
+        log.Println("Error: writing file for item",err)
         block <- 1
         return
       }
-      log.Println(written, "bytes written to",fileName)
       w.Flush()
       block <- 1
     }(item)
@@ -117,7 +113,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
     go func(item hcsvlabapi.Item) {
       annotations, err := api.GetAnnotations(item)
       if err != nil {
-        log.Println("Error obtaining annotations",err)
+        log.Println("Error: obtaining annotations",err)
         block <- 1
         return
       }
@@ -128,7 +124,6 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
 
     <-block
     <-block
-    log.Println("Moving on from",fileName)
 
     close(block)
   }
@@ -150,7 +145,7 @@ type IndriService struct {
 }
 
 func(serv IndriService) Queryall(itemList int, query string) string{
-  log.Println("Query all recieved request for itemlist",itemList, " with query",query)
+  log.Println("Info: Query all recieved request for itemlist",itemList, " with query",query)
   itemListHelper := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
@@ -169,7 +164,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   cmd.Stdout = out
   err = cmd.Run()
   if err != nil {
-    log.Println("QueryAll encountered this error:",err)
+    log.Println("Error: QueryAll encountered this error:",err)
     return stringError(err)
   }
 
@@ -199,14 +194,14 @@ func(serv IndriService) Queryall(itemList int, query string) string{
     } else if state == 2 {
       location, err = strconv.ParseInt(scanner.Text(),10,64)
       if err != nil {
-        log.Println("Couldn't parse location in result")
+        log.Println("Error: Couldn't parse location in result")
       }
       state = 3
     } else if state == 3 {
       match = scanner.Text()
       item := &MatchItem{docId,getUrlForDocId(docId),location,match}
       res.Matches = append(res.Matches,item)
-      log.Println("Match complete",item)
+      log.Println("Progress: Found match",item)
 
       location = 0
       docId = ""
@@ -225,7 +220,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
 }
 
 func(serv IndriService) Query(itemList int, query string) string{
-  log.Println("Query for doc matches received:",query)
+  log.Println("Info: Query for doc matches received:",query)
   itemListHelper := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
@@ -240,7 +235,7 @@ func(serv IndriService) Query(itemList int, query string) string{
   cmd.Stdout = &out
   err = cmd.Run()
   if err != nil {
-    log.Println("Query encountered this error:",err)
+    log.Println("Error: Query encountered this error:",err)
     return stringError(err)
   }
   scanner := bufio.NewScanner(bytes.NewBufferString(out.String()))
@@ -258,11 +253,11 @@ func(serv IndriService) Query(itemList int, query string) string{
     } else {
       start, err := strconv.ParseInt(A[2],10,64)
       if err != nil {
-        log.Println("Couldn't parse start in result")
+        log.Println("Error: Couldn't parse start in result")
       }
       end, err := strconv.ParseInt(A[3],10,64)
       if err != nil {
-        log.Println("Couldn't parse end in result")
+        log.Println("Error: Couldn't parse end in result")
       }
       docId := itemListHelper.docIdForFile(A[1])
       match := &MatchDoc{docId,getUrlForDocId(docId),start,end}
@@ -277,7 +272,7 @@ func(serv IndriService) Query(itemList int, query string) string{
 }
 
 func(serv IndriService) Index(itemList int) string{
-  log.Println("Request to index itemList",itemList)
+  log.Println("Info: Request to index itemList",itemList)
   itemListHelper := &ItemListHelper{itemList}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("text/plain; charset=\"utf-8\"")
@@ -291,24 +286,24 @@ func(serv IndriService) Index(itemList int) string{
     goto errHandle
   }
 
-  log.Println("Removing old index")
+  log.Println("Progress: Removing old index")
   err = itemListHelper.RemoveRepo()
   if err != nil {
     goto errHandle
   }
 
-  log.Println("Beginning indexing")
+  log.Println("Progress: Beginning indexing")
   cmd.Stdout = &out
   err = cmd.Run()
   if err != nil {
     goto errHandle
   }
-  log.Println("Removing data")
+  log.Println("Progress: Removing data")
   err = itemListHelper.RemoveData()
   if err != nil {
     goto errHandle
   }
-  log.Println("Indexing complete")
+  log.Println("Progress: Indexing complete")
 
 
 
@@ -316,7 +311,7 @@ func(serv IndriService) Index(itemList int) string{
   
   errHandle:
 
-  log.Println("Index encountered this error:",err)
+  log.Println("Error: Index encountered this error:",err)
   return stringError(err)
 }
 
@@ -336,11 +331,11 @@ func main() {
 }
 
 func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string) (err error){
-  log.Println("Checking itemlists to see if",itemListId, "is in progress")
+  log.Println("Progress: Checking itemlists to see if",itemListId, "is in progress")
 
   progressMutex.Lock()
   if itemListsInProgress[itemListId] != 0 {
-    log.Println("Indexing already in progress")
+    log.Println("Error: Indexing already in progress")
     err = errors.New("Itemlist is already being indexed. Please wait for the indexing to complete")
     return
   }
@@ -353,7 +348,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   progressMutex.Unlock()
 
 
-  log.Println("Indexing itemlist",itemListId,"with number of workers:",numWorkers)
+  log.Println("Progress: Indexing itemlist",itemListId,"with number of workers:",numWorkers)
   api := hcsvlabapi.Api{apiBase,apiKey}
   ver,err := api.GetVersion()
   if err != nil {
@@ -392,7 +387,6 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     // It also writes the index file
     tagid := 1
     docid := 1
-    log.Println("Starting to annotate")
     defer func() {
       doneWriting <- 1
     }()
@@ -400,7 +394,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     // Create annotations writer
     annFo, err := os.Create(path.Join(itemListHelper.ConfigLocation(),"annotation.offsets"))
     if err != nil {
-      log.Println("Error unable to create annotations offset file",err)
+      log.Println("Error: unable to create annotations offset file",err)
       return
     }
     annWriter := bufio.NewWriter(annFo)
@@ -408,24 +402,22 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     defer func() {
       annWriter.Flush()
       if err := annFo.Close(); err != nil {
-        log.Println("Error unable to close annotations offset file",err)
+        log.Println("Error: unable to close annotations offset file",err)
       }
-      log.Println("Closing annFo")
     }()
 
     // Create index properties writer
     ixFo, err := os.Create(path.Join(itemListHelper.ConfigLocation(),"index.properties"))
     if err != nil {
-      log.Println("Error unable to create index description file",err)
+      log.Println("Error: unable to create index description file",err)
       return
     }
     ixWriter := bufio.NewWriter(ixFo)
 
     defer func() {
-      log.Println("Closing ixFo")
       ixWriter.Flush()
       if err := ixFo.Close(); err != nil {
-        log.Println("Couldn't close the ixWriter",err)
+        log.Println("Error: Couldn't close the ixWriter",err)
       }
     }()
 
@@ -436,18 +428,18 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     fmt.Fprintf(ixWriter,"  <path>%s</path>\n",itemListHelper.DataLocation())
 
     for da := range annotationsProcessor {
-      log.Println("writing annotations for",da.Filename)
+      log.Println("Progress: Writing annotations for",da.Filename)
 
       if da.AnnotationList != nil {
         for _, annotation := range da.AnnotationList.Annotations {
           aEnd,err := strconv.Atoi(annotation.End)
           if err != nil {
-            log.Println("Unable to convert end annotation",annotation.End,"to int")
+            log.Println("Error: Unable to convert end annotation",annotation.End,"to int")
             continue
           }
           aStart,err := strconv.Atoi(annotation.Start)
           if err != nil {
-            log.Println("Unable to convert end annotation",annotation.Start,"to int")
+            log.Println("Error: Unable to convert end annotation",annotation.Start,"to int")
             continue
           }
           if aEnd-aStart == 0 {
@@ -461,14 +453,12 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
       docid++
     }
     fmt.Fprintf(ixWriter,"</corpus>\n</parameters>")
-    log.Println("Finished ix descriptor")
   }()
 
   for _, s := range il.Items {
     requests <- s
     k++
   }
-  log.Println("Number of items:",k)
 
   close(requests)
 
@@ -476,7 +466,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     select {
       case <-block:
        numWorkers--
-       log.Println("A thread done: ",numWorkers, " remaining")
+       log.Println("Progress: Worker completed,",numWorkers, "remaining")
        if numWorkers == 0 {
          close(annotationsProcessor)
          <-doneWriting
