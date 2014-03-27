@@ -18,37 +18,6 @@ import (
   "github.com/TimothyJones/hcsvlabapi"
 )
 
-type ErrorResponse struct {
-  Class string `json:"type"`
-  Err string `json:"error"`
-}
-
-type AllQueryResult struct {
-  Class string `json:"type"`
-  IndexCreatedTime string `json:"index_created_time"`
-  Matches []*MatchItem
-}
-
-type DocQueryResult struct {
-  Class string `json:"type"`
-  IndexCreatedTime string `json:"index_created_time"`
-  Matches []*MatchDoc
-}
-
-type MatchItem struct {
-  DocId string `json:"docid"`
-  Url string `json:"url"`
-  Location int64 `json:"location"`
-  Match string `json:"match"`
-}
-
-type MatchDoc struct {
-  DocId string `json:"docid"`
-  Url string `json:"url"`
-  Start int64 `json:"start"`
-  End int64 `json:"end"`
-}
-
 var (
  itemListsInProgress map[int]int
  progressMutex sync.Mutex
@@ -59,15 +28,6 @@ func getUrlForDocId(docId string) string {
   return config.ApiPath + "/catalog/" + docId
 }
 
-
-func stringError(err error) (string) {
-  var response = ErrorResponse{"error",err.Error()}
-  result, errMars := json.Marshal(response);
-  if errMars != nil {
-    return "{type: \"error\",message: \"Cannot marshal json error\"}"
-  }
-  return string(result)
-}
 
 func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListHelper *ItemListHelper) {
   for r := range requests {
@@ -268,7 +228,9 @@ func(serv IndriService) Query(itemList int, query string) string{
   if errMars != nil {
     return "{type: \"error\",message: \"Cannot marshal json response\"}"
   }
-  return string(result)
+  str := string(result)
+  str = str[strings.LastIndex(str,"\n"):]
+  return str
 }
 
 func(serv IndriService) Index(itemList int) string{
