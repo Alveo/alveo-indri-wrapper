@@ -80,7 +80,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
         block <- 1
         return
       }
-      da := &documentAnnotations{fileName,&annotations}
+      da := &documentAnnotations{path.Join(itemListHelper.DataLocation(),fileName),&annotations}
       annotationsProcessor <- da
       block <-1
     }(item)
@@ -220,7 +220,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   }
   result, errMars := json.Marshal(res);
   if errMars != nil {
-    return stringError(errorMars)
+    return stringError(errMars)
   }
   return string(result)
 }
@@ -467,9 +467,10 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
             continue
           }
           if aEnd-aStart == 0 {
-            fmt.Fprintf(annWriter,"%s\tannotation\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annotation.Label,aStart,aEnd-aStart)
+            // docno, ATTRIBUTE or TAG,id, name, start , length (ignored for attribute), value (optional int64 for TAGs, string for attribute) , parent,debyg
+            fmt.Fprintf(annWriter,"%s\tATTRIBUTE\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annotation.Label,aStart,aEnd-aStart)
           } else {
-            fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,docid,tagid,annotation.Label,aStart,aEnd-aStart)
+            fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annotation.Label,aStart,aEnd-aStart)
           }
           tagid++
         }
