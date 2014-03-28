@@ -10,8 +10,16 @@ type ErrorResponse struct {
 }
 
 type IndexResponse struct {
-  Class string `json:type`
-  Message string `json:"message"`
+  Class string `json:"type"`
+  IndexStartedTime string `json:"index_started_time"`
+}
+
+type IndexProgressResponse struct {
+  Class string `json:"type"`
+  ItemsDownloaded int `json:"items_downloaded"`
+  TotalToDownload int `json:"total_items"`
+  IndexComplete bool `json:"index_complete"`
+  IndexCreatedTime string `json:"index_created_time"`
 }
 
 type AllQueryResult struct {

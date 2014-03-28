@@ -4,6 +4,7 @@ import (
   "path"
   "errors"
   "strings"
+  "time"
   "strconv"
   "os"
 )
@@ -11,6 +12,8 @@ import (
 type ItemListHelper struct {
   Id int
 }
+
+const TimeFormat = time.RFC1123
 
 // Returns the location for the index
 func (il *ItemListHelper) RepoLocation() string {
@@ -65,7 +68,7 @@ func (il *ItemListHelper) CreatedTime() (time string,err error) {
     return
   }
 
-  time = fi.ModTime().Format("Jan 2, 2006 at 3:04pm (MST)")
+  time = fi.ModTime().Format(TimeFormat)
   return
 }
 
