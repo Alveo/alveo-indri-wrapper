@@ -145,7 +145,7 @@ func(serv IndriService) Progress(itemList int,after string) string{
 
   result, errMars := json.Marshal(res);
   if errMars != nil {
-    return "{type: \"error\",message: \"Cannot marshal json response\"}"
+    return stringError(errMars)
   }
   return string(result)
 }
@@ -220,7 +220,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   }
   result, errMars := json.Marshal(res);
   if errMars != nil {
-    return "{type: \"error\",message: \"Cannot marshal json response\"}"
+    return stringError(errorMars)
   }
   return string(result)
 }
@@ -272,7 +272,7 @@ func(serv IndriService) Query(itemList int, query string) string{
   }
   result, errMars := json.Marshal(res);
   if errMars != nil {
-    return "{type: \"error\",message: \"Cannot marshal json response\"}"
+    return stringError(errMars)
   }
   str := string(result)
   str = str[strings.LastIndex(str,"\n"):]
@@ -348,7 +348,7 @@ func(serv IndriService) Index(itemList int) string{
 
   result, errMars := json.Marshal(res);
   if errMars != nil {
-    return "{type: \"error\",message: \"Cannot marshal json response\"}"
+    return stringError(errMars)
   }
   return string(result)
 }
