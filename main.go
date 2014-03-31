@@ -451,6 +451,8 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     fmt.Fprintf(ixWriter,"  <annotations>%s</annotations>\n",path.Join(itemListHelper.ConfigLocation(),"annotation.offsets"))
     fmt.Fprintf(ixWriter,"  <path>%s</path>\n",itemListHelper.DataLocation())
 
+    tn := NewTagNameConverter()
+
     for da := range annotationsProcessor {
       log.Println("Progress: Writing annotations for",da.Filename)
 
@@ -466,16 +468,25 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
             log.Println("Error: Unable to convert end annotation",annotation.Start,"to int")
             continue
           }
-          if aEnd-aStart == 0 {
-            // docno, ATTRIBUTE or TAG,id, name, start , length (ignored for attribute), value (optional int64 for TAGs, string for attribute) , parent,debyg
-            fmt.Fprintf(annWriter,"%s\tATTRIBUTE\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annotation.Label,aStart,aEnd-aStart)
+          annoName,err := tn.Name(annotation.Label)
+
+          if err == nil {
+            if aEnd-aStart == 0 {
+              // docno, ATTRIBUTE or TAG,id, name, start , length (ignored for attribute), value (optional int64 for TAGs, string for attribute) , parent,debyg
+              fmt.Fprintf(annWriter,"%s\tATTRIBUTE\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+            } else {
+              fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+            }
+            tagid++
           } else {
-            fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annotation.Label,aStart,aEnd-aStart)
+            log.Println("Error: Unable to find a name for this annotation:",annotation.Label)
           }
-          tagid++
         }
       }
       docid++
+    }
+    for field := range tn.Used {
+      fmt.Fprintf(ixWriter,"<field><name>%s</name></field>",field)
     }
     fmt.Fprintf(ixWriter,"</corpus>\n</parameters>")
   }()
