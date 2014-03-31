@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<!-- saved from url=(0048)http://ic2-hcsvlab-staging1-vm.intersect.org.au/ -->
+<html lang="en" class=""><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  
+
+  <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+  <style type="text/css">
+    .result {
+      padding: 10px;
+    }
+
+    .error {
+      
+    }
+  </style>
+</head>
+
+<body>
+  <form id="index">
+    <input name="il" placeholder="Itemlist to index">
+    <input type="submit" value="Index">
+  </form>
+
+  <form id="search">
+    <input name="query" placeholder="Search query">
+    <input type="submit" value="Search">
+    <input type="radio" name="query-type" id="query-all" value="all" checked="checked">
+    <label for="query-all">All matches</label>
+    <input type="radio" name="query-type" id="query-doc" value="doc">
+    <label for="query-doc">Documents only</label>
+  </form>  
+  <div id="time"> </div>
+  <div id="progress"></div>
+  <div id="results"> </div>
+
+  <script> 
+    function error(str) {
+      alert(str);
+    }
+
+    $( "#index" ).submit(function (event) {
+      var itemList = $(this).children("[name='il']").val();
+      $.getJSON("http://127.0.0.1:8787/index/"+ itemList, function (data) {
+        //        $("#results").text(data);
+        console.log(data);
+        switch (data["type"])  {
+          case "indexing":
+            $("<div/>", {
+              "text":"Indexing started at " + data.index_started_time,
+            }).appendTo("#results");
+          
+            var checkForUpdates;
+
+            checkForUpdates = setInterval(function() {
+              $.getJSON("http://127.0.0.1:8787/progress/"+ itemList + "/" + encodeURIComponent(data.index_started_time),function(data) {
+                console.log(data);
+                switch (data["type"])  {
+                  case "progress":
+                    if(data.index_complete) {
+                      $("#progress").text("Indexing complete");
+                      clearInterval(checkForUpdates);
+                    } else {
+                      if(data.items_downloaded == 1) {
+                        // first item is the itemlist
+                        $("#progress").text("Indexing beginning...");
+                       } else {
+                        $("#progress").text("Indexing processed " + (data.items_downloaded-1) + " of " + data.total_items);
+                      }
+                    }
+                    break;
+                  case "error":
+                      $("<div/>", {
+                        "class":"error",
+                        "text":"Error when indexing: " + data.error,
+                      }).appendTo("#progress");
+                      clearInterval(checkForUpdates);
+                    break;
+                  case "default":
+                    break;
+                }
+              });
+              
+            },1000)
+
+          break;
+          case "error":
+            $("<div/>", {
+              "class":"error",
+              "text":"Error when indexing: " + data.error,
+            }).appendTo("#results");
+          break;
+          default:
+          alert("Unexpected " + data["type"]);
+        }
+
+      });
+
+      event.preventDefault();
+    });
+
+    $( "#search" ).submit(function( event ) {
+      var query = $(this).children("[name='query']").val();
+      $.getJSON("http://127.0.0.1:8787/query/" + $(this).children("[name='query-type']:checked").val() +  "/11/" + encodeURIComponent(query),function(data) {
+        console.log(data);
+        var index;
+        $("#results").text("");
+
+        switch (data["type"])  {
+          case "result-all":
+            $("#time").text("Index created at " + data["index_created_time"]);
+            for (index = 0; index < data.Matches.length; index++) {
+              $("<div/>",{
+                "class":"result",
+                "id":"result" + index, 
+                "text":data.Matches[index].match,
+              }).appendTo("#results");
+
+              $("#result" + index).prepend($("<h3/>",{
+                "text":":" + data.Matches[index]["location"],
+              }));
+              $("#result" + index + " h3").prepend($("<a/>",{
+                  "text":data.Matches[index].docid,
+                  "href":data.Matches[index].url,
+              }));
+            }
+            break;
+          case "result-doc":
+            $("#time").text("Index created at " + data["index_created_time"]);
+            for (index = 0; index < data.Matches.length; index++) {
+              $("<div/>",{
+                "class":"result",
+                "id":"result" + index, 
+                "text":data.Matches[index].start + "-" + data.Matches[index].end,
+              }).appendTo("#results");
+
+              $("#result" + index).prepend($("<h3/>",{
+              }));
+              $("#result" + index + " h3").prepend($("<a/>",{
+                  "text":data.Matches[index].docid,
+                  "href":data.Matches[index].url,
+              }));
+            }
+            break;
+          case "error": 
+            $("<div/>", {
+              "class":"error",
+              "text":"Error processing query: " + data.error,
+            }).appendTo("#results");
+            break;
+          default:
+            alert("Unexpected " + data["type"]);
+        }
+      });
+      event.preventDefault();
+    });
+  </script>
+</body>
+
