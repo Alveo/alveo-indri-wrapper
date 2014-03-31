@@ -5,12 +5,14 @@ import (
   "log"
   "bufio"
   "time"
+  "io/ioutil"
   "os"
   "path"
   "errors"
   "strings"
   "sync"
   "net/http"
+  "net/url"
   "encoding/json"
   "bytes"
   "os/exec"
@@ -105,11 +107,41 @@ type documentAnnotations struct {
 
 //Service Definition
 type IndriService struct {
-  gorest.RestService `root:"/"`
+  gorest.RestService `root:"/" consumes:"application/x-www-form-urlencoded"`
   query  gorest.EndPoint `method:"GET" path:"/query/doc/{itemList:int}/{query:string}" output:"string"`
   queryall  gorest.EndPoint `method:"GET" path:"/query/all/{itemList:int}/{query:string}" output:"string"`
   index    gorest.EndPoint `method:"GET" path:"/index/{itemList:int}" output:"string"`
   progress gorest.EndPoint `method:"GET" path:"/progress/{itemList:int}/{after:string}" output:"string"`
+  web gorest.EndPoint `method:"GET" path:"/web/{url:string}" output:"string"`
+  begin gorest.EndPoint `method:"POST" path:"/begin/" postdata:"map[string]"`
+}
+
+
+func(serv IndriService) Begin(PostData map[string][]string) {
+  log.Println("Info: Asked to kickoff: ",PostData)
+  serv.ResponseBuilder().SetHeader("Set-Cookie","vlab-api=" +" ; vlab-key=")
+  serv.ResponseBuilder().SetResponseCode(201).Location("/web/begin.html")
+}
+
+
+
+func(serv IndriService) Web(url string) string {
+  log.Println("Info: Asked to serve",url)
+  url = strings.TrimLeft(url,"/\\.")
+  begin, err := ioutil.ReadFile(path.Join(config.WebDir,path.Clean(url)))
+  if err != nil {
+    serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+    serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+    return stringError(err)
+  }
+
+  if strings.HasSuffix(url,".js") {
+    serv.ResponseBuilder().SetContentType("text/javascript; charset=\"utf-8\"")
+  } else {
+    serv.ResponseBuilder().SetContentType("text/html; charset=\"utf-8\"")
+  }
+
+  return string(begin)
 }
 
 func(serv IndriService) Progress(itemList int,after string) string{
@@ -356,6 +388,35 @@ func(serv IndriService) Index(itemList int) string{
   return string(result)
 }
 
+
+
+func urlMarshall(v interface{}) ([]byte, error) {
+  return nil, nil
+}
+
+func urlUnMarshall(data []byte, v interface{}) error {
+  fmt.Println("recieved",string(data))
+  m, err := url.ParseQuery(string(data))
+  if err != nil {
+    return err
+  }
+  switch provided := v.(type) {
+    case *map[string][]string:
+      for k := range m {
+        (*provided)[k] = m[k]
+      }
+    default:
+      return errors.New("Unmarshall error: map of string slices not supplied as argument (instead"+fmt.Sprintf("%t",provided)+" was supplied)")
+  }
+
+  return nil
+}
+
+
+func NewUrlMarshaller() *gorest.Marshaller{
+   return &gorest.Marshaller{urlMarshall,urlUnMarshall}
+}
+
 func main() {
   var err error
   config, err = ReadConfig()
@@ -365,6 +426,7 @@ func main() {
     return
   }
   fmt.Println(config)
+  gorest.RegisterMarshaller("application/x-www-form-urlencoded", NewUrlMarshaller())
   gorest.RegisterService(new(IndriService)) //Register our service
   itemListsInProgress = make(map[int]int)
   itemListSize = make(map[int]int)

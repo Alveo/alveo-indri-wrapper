@@ -15,6 +15,7 @@ type Config struct {
   Binaries ConfigPaths
   ApiPath string
   ApiKey string
+  WebDir string
 }
 
 func ReadConfig() (conf Config, err error) {

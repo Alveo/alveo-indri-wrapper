@@ -6,4 +6,5 @@
   },
   "ApiPath":"http://ic2-hcsvlab-staging2-vm.intersect.org.au/",
   "ApiKey":""
+  "WebDir":"web"
 }
