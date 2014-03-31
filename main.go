@@ -255,7 +255,11 @@ func(serv IndriService) Query(itemList int, query string) string{
   for scanner.Scan() {
     A := strings.Split(scanner.Text(),"\t")
     if len(A) != 4 {
-      log.Println("Error: response contains less than four fields")
+      log.Println("Error: response contains less than four fields (",scanner.Text(),")")
+      if strings.Contains(scanner.Text(),"Couldn't understand this query") {
+        log.Println("Error: Indri did not understand the query")
+        return stringError(errors.New("Indri did not understand the query"))
+      }
     } else {
       start, err := strconv.ParseInt(A[2],10,64)
       if err != nil {
@@ -275,7 +279,6 @@ func(serv IndriService) Query(itemList int, query string) string{
     return stringError(errMars)
   }
   str := string(result)
-  str = str[strings.LastIndex(str,"\n"):]
   return str
 }
 
@@ -485,10 +488,11 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
       }
       docid++
     }
+    fmt.Fprintf(ixWriter,"</corpus>")
     for field := range tn.Used {
-      fmt.Fprintf(ixWriter,"<field><name>%s</name></field>",field)
+      fmt.Fprintf(ixWriter,"<field><name>%s</name></field>\n",field)
     }
-    fmt.Fprintf(ixWriter,"</corpus>\n</parameters>")
+    fmt.Fprintf(ixWriter,"</parameters>")
   }()
 
   itemListSize[itemListId] = len(il.Items)
