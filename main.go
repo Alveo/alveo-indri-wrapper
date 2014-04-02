@@ -7,6 +7,7 @@ import (
   "time"
   "io/ioutil"
   "os"
+  "reflect"
   "path"
   "errors"
   "strings"
@@ -119,7 +120,19 @@ type IndriService struct {
 
 func(serv IndriService) Begin(PostData map[string][]string) {
   log.Println("Info: Asked to kickoff: ",PostData)
-  serv.ResponseBuilder().SetHeader("Set-Cookie","vlab-api=" +" ; vlab-key=")
+
+  key, ok := PostData["api_key"]
+  if ! ok {
+    serv.ResponseBuilder().SetResponseCode(400)
+    return
+  }
+  apiLocation, ok := PostData["item_list_url"]
+  if ! ok {
+    serv.ResponseBuilder().SetResponseCode(400)
+    return
+  }
+  serv.ResponseBuilder().SetHeader("Set-Cookie","vlab-key=" + key[0]) 
+  serv.ResponseBuilder().SetHeader("Set-Cookie","vlab-api=" + apiLocation[0])
   serv.ResponseBuilder().SetResponseCode(201).Location("/web/begin.html")
 }
 
@@ -396,19 +409,16 @@ func urlMarshall(v interface{}) ([]byte, error) {
 
 func urlUnMarshall(data []byte, v interface{}) error {
   fmt.Println("recieved",string(data))
-  m, err := url.ParseQuery(string(data))
+  parsed, err := url.ParseQuery(string(data))
   if err != nil {
     return err
   }
-  switch provided := v.(type) {
-    case *map[string][]string:
-      for k := range m {
-        (*provided)[k] = m[k]
-      }
-    default:
-      return errors.New("Unmarshall error: map of string slices not supplied as argument (instead"+fmt.Sprintf("%t",provided)+" was supplied)")
-  }
 
+  mp, ok := v.(*map[string][]string);
+  if !ok {
+    return errors.New("Supplied interface was "+reflect.ValueOf(v).Type().String() + " instead of map[string][]string")
+  }
+  *mp  = parsed
   return nil
 }
 
