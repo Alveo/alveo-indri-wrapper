@@ -28,7 +28,7 @@ func isNotLower(r rune) rune {
 
 func (tn *TagNameConverter) Name(original string) (string, error) {
   if existingName, ok := tn.Names[original] ; ok {
-    log.Println("Info: Annotation",original,"is already",existingName)
+    //log.Println("Info: Annotation",original,"is already",existingName)
     return existingName, nil
   }
 
@@ -44,7 +44,7 @@ func (tn *TagNameConverter) Name(original string) (string, error) {
   queue <- name
 
   for q := range queue {
-    log.Printf("Info: Testing possible annotation name '%s'\n",q)
+    //log.Printf("Info: Testing possible annotation name '%s'\n",q)
     if _, isSet := tn.Used[q] ; ! isSet {
       log.Println("Info: Annotation",original,"becomes",q)
       tn.Names[original] = q
