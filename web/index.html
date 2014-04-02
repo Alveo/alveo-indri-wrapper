@@ -41,7 +41,7 @@
 
     $( "#index" ).submit(function (event) {
       var itemList = $(this).children("[name='il']").val();
-      $.getJSON("http://127.0.0.1:8787/index/"+ itemList, function (data) {
+      $.getJSON("/index/"+ itemList, function (data) {
         //        $("#results").text(data);
         console.log(data);
         switch (data["type"])  {
@@ -53,7 +53,7 @@
             var checkForUpdates;
 
             checkForUpdates = setInterval(function() {
-              $.getJSON("http://127.0.0.1:8787/progress/"+ itemList + "/" + encodeURIComponent(data.index_started_time),function(data) {
+              $.getJSON("/progress/"+ itemList + "/" + encodeURIComponent(data.index_started_time),function(data) {
                 console.log(data);
                 switch (data["type"])  {
                   case "progress":
@@ -101,7 +101,15 @@
 
     $( "#search" ).submit(function( event ) {
       var query = $(this).children("[name='query']").val();
-      $.getJSON("http://127.0.0.1:8787/query/" + $(this).children("[name='query-type']:checked").val() +  "/11/" + encodeURIComponent(query),function(data) {
+      var itemlist = $("[name='il']").val();
+      if (!( !isNaN(parseFloat(itemlist)) && isFinite(itemlist))) {
+        // Itemlist is not a number
+        alert("Please provide a valid number for your itemlist");
+        event.preventDefault();
+        return false;
+      } 
+      
+      $.getJSON("/query/" + $(this).children("[name='query-type']:checked").val() +  "/"+itemlist+"/" + encodeURIComponent(query),function(data) {
         console.log(data);
         var index;
         $("#results").text("");
