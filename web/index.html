@@ -41,7 +41,7 @@
 
     $( "#index" ).submit(function (event) {
       var itemList = $(this).children("[name='il']").val();
-      $.getJSON("/index/"+ itemList, function (data) {
+      $.getJSON("/indri/index/"+ itemList, function (data) {
         //        $("#results").text(data);
         console.log(data);
         switch (data["type"])  {
@@ -53,7 +53,7 @@
             var checkForUpdates;
 
             checkForUpdates = setInterval(function() {
-              $.getJSON("/progress/"+ itemList + "/" + encodeURIComponent(data.index_started_time),function(data) {
+              $.getJSON("/indri/progress/"+ itemList + "/" + encodeURIComponent(data.index_started_time),function(data) {
                 console.log(data);
                 switch (data["type"])  {
                   case "progress":
@@ -109,7 +109,7 @@
         return false;
       } 
       
-      $.getJSON("/query/" + $(this).children("[name='query-type']:checked").val() +  "/"+itemlist+"/" + encodeURIComponent(query),function(data) {
+      $.getJSON("/indri/query/" + $(this).children("[name='query-type']:checked").val() +  "/"+itemlist+"/" + encodeURIComponent(query),function(data) {
         console.log(data);
         var index;
         $("#results").text("");
@@ -117,6 +117,12 @@
         switch (data["type"])  {
           case "result-all":
             $("#time").text("Index created at " + data["index_created_time"]);
+            if(data.Matches.length == 0) {
+              $("<div/>", {
+                "class":"error",
+                "text":"No results for query '" + query + "'",
+              }).appendTo("#results");
+            }
             for (index = 0; index < data.Matches.length; index++) {
               $("<div/>",{
                 "class":"result",
@@ -134,7 +140,14 @@
             }
             break;
           case "result-doc":
-            $("#time").text("Index created at " + data["index_created_time"]);
+          $("#time").text("Index created at " + data["index_created_time"]);
+
+            if(data.Matches.length == 0) {
+              $("<div/>", {
+                "class":"error",
+                "text":"No results for query '" + query + "'",
+              }).appendTo("#results");
+            }
             for (index = 0; index < data.Matches.length; index++) {
               $("<div/>",{
                 "class":"result",

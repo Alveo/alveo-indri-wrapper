@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- saved from url=(0048)http://ic2-hcsvlab-staging1-vm.intersect.org.au/ -->
 <html lang="en" class=""><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <meta charset="utf-8">
   
@@ -19,5 +18,81 @@
 
 <body>
   <h1>Welcome to the Indri Web Wrapper </h1>
-</body>
+    <div id="progress"></div>
+    <div id="results"></div>
+
+	<script>
+      $(function () {
+        var api = $.cookie('vlab-api');
+        var key = $.cookie('vlab-key');
+        var itemList = $.cookie('vlab-action-itemlist');
+
+        if(api === undefined || key === undefined || itemList === undefined ) {
+            $("<div/>", {
+              "class":"error",
+              "text":"Error: Missing api ("+api+"), key ("+key+") or itemList ("+itemList+")",
+            }).appendTo("#results");
+            return;
+         }
+
+          $.removeCookie('vlab-action-itemlist');
+
+        $.getJSON("/indri/index/"+ itemList, function (data) {
+          //        $("#results").text(data);
+          console.log(data);
+          switch (data["type"])  {
+            case "indexing":
+              $("<div/>", {
+                "text":"Indexing started at " + data.index_started_time,
+              }).appendTo("#results");
+            
+              var checkForUpdates;
+
+              checkForUpdates = setInterval(function() {
+                $.getJSON("/indri/progress/"+ itemList + "/" + encodeURIComponent(data.index_started_time),function(data) {
+                  console.log(data);
+                  switch (data["type"])  {
+                    case "progress":
+                      if(data.index_complete) {
+                        $("#progress").text("Indexing itemlist "+itemList+" complete");
+                        clearInterval(checkForUpdates);
+                      } else {
+                        if(data.items_downloaded == 1) {
+                          // first item is the itemlist
+                          $("#progress").text("Indexing itemlist "+ itemList +", beginning...");
+                         } else {
+                          $("#progress").text("Indexing itemlist "+itemList+": processed " + (data.items_downloaded-1) + " of " + data.total_items);
+                        }
+                      }
+                      break;
+                    case "error":
+                        $("<div/>", {
+                          "class":"error",
+                          "text":"Error when indexing: " + data.error,
+                        }).appendTo("#progress");
+                        clearInterval(checkForUpdates);
+                      break;
+                    case "default":
+                      break;
+                  }
+                });
+                
+              },1000)
+
+            break;
+            case "error":
+              $("<div/>", {
+                "class":"error",
+                "text":"Error when indexing: " + data.error,
+              }).appendTo("#results");
+            break;
+            default:
+            alert("Unexpected " + data["type"]);
+          }
+
+        });
+
+      });
+  </script>
+  </body>
 

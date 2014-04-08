@@ -109,17 +109,24 @@ type documentAnnotations struct {
 //Service Definition
 type IndriService struct {
   gorest.RestService `root:"/" consumes:"application/x-www-form-urlencoded"`
-  query  gorest.EndPoint `method:"GET" path:"/query/doc/{itemList:int}/{query:string}" output:"string"`
-  queryall  gorest.EndPoint `method:"GET" path:"/query/all/{itemList:int}/{query:string}" output:"string"`
-  index    gorest.EndPoint `method:"GET" path:"/index/{itemList:int}" output:"string"`
-  progress gorest.EndPoint `method:"GET" path:"/progress/{itemList:int}/{after:string}" output:"string"`
-  web gorest.EndPoint `method:"GET" path:"/web/{url:string}" output:"string"`
-  begin gorest.EndPoint `method:"POST" path:"/begin/" postdata:"map[string]"`
+  query  gorest.EndPoint `method:"GET" path:"/indri/query/doc/{itemList:int}/{query:string}" output:"string"`
+  queryall  gorest.EndPoint `method:"GET" path:"/indri/query/all/{itemList:int}/{query:string}" output:"string"`
+  index    gorest.EndPoint `method:"GET" path:"/indri/index/{itemList:int}" output:"string"`
+  progress gorest.EndPoint `method:"GET" path:"/indri/progress/{itemList:int}/{after:string}" output:"string"`
+  web gorest.EndPoint `method:"GET" path:"/indri/{url:string}" output:"string"`
+  begin gorest.EndPoint `method:"POST" path:"/indri/" postdata:"map[string]"`
 }
 
 
 func(serv IndriService) Begin(PostData map[string][]string) {
   log.Println("Info: Asked to kickoff: ",PostData)
+
+  apiCookie,err  := serv.Context.Request().Cookie("vlab-api")
+  if err != nil {
+    log.Println("Error, cookie not found")
+  }else {
+    log.Println("Info: Cookie is " + apiCookie.String())
+  }
 
   key, ok := PostData["api_key"]
   if ! ok {
@@ -131,9 +138,26 @@ func(serv IndriService) Begin(PostData map[string][]string) {
     serv.ResponseBuilder().SetResponseCode(400)
     return
   }
-  serv.ResponseBuilder().SetHeader("Set-Cookie","vlab-key=" + key[0]) 
-  serv.ResponseBuilder().SetHeader("Set-Cookie","vlab-api=" + apiLocation[0])
-  serv.ResponseBuilder().SetResponseCode(201).Location("/web/begin.html")
+
+  if len(apiLocation) == 0 || len(key) == 0 {
+    serv.ResponseBuilder().SetResponseCode(400).WriteAndOveride([]byte("Missing API or key"))
+    return
+  }
+
+  idxSlash := strings.LastIndex(apiLocation[0],"/")
+  if idxSlash == -1 {
+    serv.ResponseBuilder().SetResponseCode(400).WriteAndOveride([]byte("No slash for the itemList number"))
+    return
+  }
+  itemListIdString := apiLocation[0][idxSlash+1:]
+  apiBase := strings.TrimSuffix(apiLocation[0],"/itemlist/" + itemListIdString)
+  itemListIdString = strings.TrimSuffix(itemListIdString,".json")
+
+  serv.ResponseBuilder().AddHeader("Set-Cookie","vlab-action-itemlist=" + itemListIdString)
+  serv.ResponseBuilder().AddHeader("Set-Cookie","vlab-api=" + apiBase)
+  serv.ResponseBuilder().AddHeader("Set-Cookie","vlab-key=" + key[0])
+  serv.ResponseBuilder().SetResponseCode(301).Location("/indri/begin.html")
+  return
 }
 
 
@@ -454,7 +478,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     return
   }
 
-  if ver.Api_version != "Sprint_22_demo" {
+  if ver.Api_version != "Sprint_23_demo" {
     err = errors.New("Server API version is incorrect:" + ver.Api_version)
     return
   }
