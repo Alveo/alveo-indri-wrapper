@@ -14,29 +14,72 @@
       
     }
   </style>
+  <link href="https://ic2-hcsvlab-staging2-vm.intersect.org.au/assets/application-ceba2be862b0c95dacc287f10d61b884.css" media="screen" rel="stylesheet" type="text/css">
 </head>
 
 <body>
-  <form id="index">
-    <input name="il" placeholder="Itemlist to index">
-    <input type="submit" value="Index">
-  </form>
+  <div class="navbar navbar-fixed-top" id="header-navbar-fixed-top">
 
-  <form id="search">
-    <input name="query" placeholder="Search query">
-    <input type="submit" value="Search">
-    <input type="radio" name="query-type" id="query-all" value="all" checked="checked">
-    <label for="query-all">All matches</label>
-    <input type="radio" name="query-type" id="query-doc" value="doc">
-    <label for="query-doc">Documents only</label>
-  </form>  
-  <div id="time"> </div>
-  <div id="progress"></div>
-  <div id="results"> </div>
+    <div class="navbar-inner">
+      <div class="container">
+        <div class="row-fluid">
+          <a href="/" class="brand">Alveo</a>
+          <ul class="nav">
+            <li class="active">
+            <a href="/indri/index.html">Query</a>
+            </li>
+            <li>
+            <a href="/item_lists">Item Lists</a>
+            </li>
+            <li>
+            <a href="/catalog">Collections</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <script> 
-    function error(str) {
-      alert(str);
+</div>
+
+<div id="main-container" class="container">
+  <div class="row-fluid clearfix">
+    <div id="sidebar" class="span3">
+      <div id="facets" class="facets sidenav">
+        <h4>
+          Search this itemlist
+        </h4>                 
+        <div class="facets-collapse">
+          <form id="search" class="search-query-form form-inline clearfix">
+            <ul class="clearfix" id="searchbar">
+              <div class="input-append pull-left">
+                <input name="il" placeholder="Itemlist id" type="text">
+              </div>
+              <div class="input-append pull-left">
+                <input class="search_q q" name="query" placeholder="Search query" type="text">
+                <button type="submit" class="btn search-btn" value="Search"><i class="icon-search"></i></button>  
+              </div>
+
+               <ul style="display: block;"> 
+                <input type="radio" name="query-type" id="query-all" value="all" checked="checked" class="count">
+                <label for="query-all" class="facet_select">All matches</label>
+                <input type="radio" name="query-type" id="query-doc" value="doc">
+                <label for="query-doc">Documents only</label>
+              </ul>
+            </ul>
+          </form>                             
+        </div>
+      </div>
+    </div>
+    <div id="time"> </div>
+    <div id="progress"></div>
+    <div id="results"> </div>
+  </div>
+</div>
+
+    <script> 
+      function error(str) {
+        alert(str);
     }
 
     $( "#index" ).submit(function (event) {
@@ -100,7 +143,7 @@
     });
 
     $( "#search" ).submit(function( event ) {
-      var query = $(this).children("[name='query']").val();
+      var query = $("[name='query']").val();
       var itemlist = $("[name='il']").val();
       if (!( !isNaN(parseFloat(itemlist)) && isFinite(itemlist))) {
         // Itemlist is not a number
@@ -109,7 +152,7 @@
         return false;
       } 
       
-      $.getJSON("/indri/query/" + $(this).children("[name='query-type']:checked").val() +  "/"+itemlist+"/" + encodeURIComponent(query),function(data) {
+      $.getJSON("/indri/query/" + $("[name='query-type']:checked").val() +  "/"+itemlist+"/" + encodeURIComponent(query),function(data) {
         console.log(data);
         var index;
         $("#results").text("");
