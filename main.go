@@ -181,7 +181,7 @@ func(serv IndriService) Progress(itemList int,after string) string{
   if err != nil {
     return stringError(errors.New("No API key specified"))
   }
-  itemListHelper := &ItemListHelper{itemList,apiKey}
+  itemListHelper := NewItemListHelper(itemList,apiKey)
 
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
@@ -225,7 +225,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   if err != nil {
     return stringError(errors.New("No API key specified"))
   }
-  itemListHelper := &ItemListHelper{itemList,apiKey}
+  itemListHelper := NewItemListHelper(itemList,apiKey)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
@@ -304,7 +304,7 @@ func(serv IndriService) Query(itemList int, query string) string{
   if err != nil {
     return stringError(errors.New("No API key specified"))
   }
-  itemListHelper := &ItemListHelper{itemList,apiKey}
+  itemListHelper := NewItemListHelper(itemList,apiKey)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
@@ -365,7 +365,7 @@ func(serv IndriService) Index(itemList int) string{
   if err != nil {
     return stringError(errors.New("No API key specified"))
   }
-  itemListHelper := &ItemListHelper{itemList,apiKey}
+  itemListHelper := NewItemListHelper(itemList,apiKey)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   // Declare upfront because of use of goto
@@ -500,7 +500,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   if err != nil {
     return
   }
-  itemListHelper := &ItemListHelper{itemListId,apiKey}
+  itemListHelper := NewItemListHelper(itemListId,apiKey)
 
   err = itemListHelper.MakeReadyForDownload()
   if err != nil {
