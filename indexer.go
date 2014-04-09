@@ -12,6 +12,11 @@ import (
 )
 
 
+type documentAnnotations struct {
+  Filename string
+  AnnotationList* hcsvlabapi.AnnotationList
+}
+
 func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListHelper *ItemListHelper) {
   for r := range requests {
     item, erro := api.GetItemFromUri(r)
