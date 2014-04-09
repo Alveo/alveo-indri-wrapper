@@ -2,11 +2,13 @@ package main
 
 import (
   "path"
+  "sync"
   "errors"
   "strings"
   "time"
   "strconv"
   "os"
+  "log"
 )
 
 type ItemListHelper struct {
@@ -14,8 +16,77 @@ type ItemListHelper struct {
   Key string
 }
 
+var itemListLocks struct {
+  itemListsInProgress map[int]int
+  errorsFromIndex map[int]error // there can only be one error per index request, so that's ok.
+  itemListSize map[int]int
+  progressMutex sync.Mutex
+}
+
 const TimeFormat = time.RFC1123
 
+func initialiseLocks() {
+  itemListLocks.itemListsInProgress = make(map[int]int)
+  itemListLocks.itemListSize = make(map[int]int)
+  itemListLocks.errorsFromIndex = make(map[int]error)
+}
+
+// Increments the indexing progress counter for this itemlist
+func (il *ItemListHelper) IncrementProgress() {
+  itemListLocks.progressMutex.Lock()
+  itemListLocks.itemListsInProgress[il.Id]++
+  itemListLocks.progressMutex.Unlock()
+}
+
+// Returns the number indexed, whether the indexing is currently progressing, and whether 
+// there have been any errors for the indexing of this itemlist
+func (il *ItemListHelper) GetProgress() (indexed int,inProgress bool, err error) {
+  itemListLocks.progressMutex.Lock()
+  indexed, inProgress = itemListLocks.itemListsInProgress[il.Id]
+  err = itemListLocks.errorsFromIndex[il.Id]
+  itemListLocks.progressMutex.Unlock()
+  return
+}
+
+func (il *ItemListHelper) SetSize(size int) {
+  itemListLocks.progressMutex.Lock()
+  itemListLocks.itemListSize[il.Id] = size
+  itemListLocks.progressMutex.Unlock()
+}
+
+func (il *ItemListHelper) GetSize() (int) {
+  itemListLocks.progressMutex.Lock()
+  ret := itemListLocks.itemListSize[il.Id]
+  itemListLocks.progressMutex.Unlock()
+  return ret
+}
+
+
+func (il *ItemListHelper) SetIndexingError(err error) {
+  itemListLocks.progressMutex.Lock()
+  itemListLocks.errorsFromIndex[il.Id] = err
+  itemListLocks.progressMutex.Unlock()
+}
+
+
+// Set the state for beginning the indexing progress for this itemlist. 
+// If indexing is currently in progress for this itemlist, this function returns an error
+// Clears any previous indexing errors if successful.
+func (il *ItemListHelper) BeginIndexingProgress() (error){
+  itemListLocks.progressMutex.Lock()
+
+  if itemListLocks.itemListsInProgress[il.Id] != 0 {
+    log.Println("Error: Indexing already in progress")
+    err := errors.New("Itemlist is already being indexed. Please wait for the indexing to complete")
+    itemListLocks.progressMutex.Unlock()
+    return err
+  }
+  itemListLocks.itemListsInProgress[il.Id] = 1
+  delete(itemListLocks.errorsFromIndex,il.Id)
+
+  itemListLocks.progressMutex.Unlock()
+  return nil
+}
 
 
 // Returns the location for the index

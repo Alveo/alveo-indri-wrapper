@@ -11,7 +11,6 @@ import (
   "path"
   "errors"
   "strings"
-  "sync"
   "net/http"
   "net/url"
   "encoding/json"
@@ -23,10 +22,6 @@ import (
 )
 
 var (
- itemListsInProgress map[int]int
- itemListSize map[int]int
- errorsFromIndex map[int]error // there can only be one error per index request, so that's ok.
- progressMutex sync.Mutex
  config Config
 )
 
@@ -91,9 +86,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
     <-block
     <-block
 
-    progressMutex.Lock()
-    itemListsInProgress[itemListHelper.Id]++
-    progressMutex.Unlock()
+    itemListHelper.IncrementProgress()
 
     close(block)
   }
@@ -193,10 +186,7 @@ func(serv IndriService) Progress(itemList int,after string) string{
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
-  progressMutex.Lock()
-  numProcessed, inProgress := itemListsInProgress[itemList]
-  err = errorsFromIndex[itemList]
-  progressMutex.Unlock()
+  numProcessed, inProgress, err := itemListHelper.GetProgress()
 
   if ! inProgress {
     return stringError(errors.New("Indexing not in progress"))
@@ -220,7 +210,7 @@ func(serv IndriService) Progress(itemList int,after string) string{
     completed = timeAfter.Before(timeCreatedTime)
   }
 
-  res := IndexProgressResponse{"progress",numProcessed,itemListSize[itemList],completed,createdTime}
+  res := IndexProgressResponse{"progress",numProcessed,itemListHelper.GetSize(),completed,createdTime}
 
   result, errMars := json.Marshal(res);
   if errMars != nil {
@@ -382,22 +372,17 @@ func(serv IndriService) Index(itemList int) string{
   cmd := exec.Command(config.Binaries.IndriBuildIndex, path.Join(itemListHelper.ConfigLocation(),"index.properties"))
   var out bytes.Buffer
 
-  progressMutex.Lock()
-  if itemListsInProgress[itemList] != 0 {
-    log.Println("Error: Indexing already in progress")
-    err = errors.New("Itemlist is already being indexed. Please wait for the indexing to complete")
-    progressMutex.Unlock()
+
+  err = itemListHelper.BeginIndexingProgress()
+  if err != nil {
     return stringError(err)
   }
-  itemListsInProgress[itemList] = 1
-  delete(errorsFromIndex,itemList)
-  progressMutex.Unlock()
 
   go func() {
     defer func() {
-      progressMutex.Lock()
-      itemListsInProgress[itemList] = 0
-      progressMutex.Unlock()
+ //     progressMutex.Lock()
+//      itemListsInProgress[itemList] = 0
+//      progressMutex.Unlock()
     }()
 
     // processing begins here
@@ -437,9 +422,7 @@ func(serv IndriService) Index(itemList int) string{
 
     log.Println("Error: Index encountered this error:",err)
 
-    progressMutex.Lock()
-    errorsFromIndex[itemList] = err
-    progressMutex.Unlock()
+    itemListHelper.SetIndexingError(err)
     return
   }()
 
@@ -487,11 +470,9 @@ func main() {
     return
   }
   fmt.Println(config)
+  initialiseLocks()
   gorest.RegisterMarshaller("application/x-www-form-urlencoded", NewUrlMarshaller())
   gorest.RegisterService(new(IndriService)) //Register our service
-  itemListsInProgress = make(map[int]int)
-  itemListSize = make(map[int]int)
-  errorsFromIndex = make(map[int]error)
   http.Handle("/",gorest.Handle())
   http.ListenAndServe(":8787",nil)
 }
@@ -617,7 +598,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     fmt.Fprintf(ixWriter,"</parameters>")
   }()
 
-  itemListSize[itemListId] = len(il.Items)
+  itemListHelper.SetSize(len(il.Items))
 
   for _, s := range il.Items {
     requests <- s
