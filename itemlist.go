@@ -16,6 +16,8 @@ type ItemListHelper struct {
 
 const TimeFormat = time.RFC1123
 
+
+
 // Returns the location for the index
 func (il *ItemListHelper) RepoLocation() string {
   return path.Join("repos",il.Key,strconv.FormatInt(int64(il.Id),10))
@@ -67,7 +69,8 @@ func (il *ItemListHelper) MkdirRepo() (err error) {
   return
 }
 
-
+// Returns the time that the index was created. Returns an error if the
+// index does not exist
 func (il *ItemListHelper) CreatedTime() (time string,err error) {
   fi, err := os.Lstat(path.Join(il.RepoLocation(),"manifest"))
   if err != nil {
@@ -79,10 +82,17 @@ func (il *ItemListHelper) CreatedTime() (time string,err error) {
   return
 }
 
+// Returns the document handle that is represented by this path.
+// Used for converting between the document in the results and
+// the document handle understood by the vlab server
 func (il *ItemListHelper) docIdForFile(filename string) string {
   return strings.TrimPrefix(filename,path.Join(il.DataLocation()))[1:]
 }
 
+
+// Convienience method for preparing the system for download.
+// Removes the old data and config directories (if any), and then
+// recreates them.
 func (il *ItemListHelper) MakeReadyForDownload() (err error) {
   err = il.RemoveData()
   if err != nil {
