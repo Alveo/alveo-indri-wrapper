@@ -11,23 +11,24 @@ import (
 
 type ItemListHelper struct {
   Id int
+  Key string
 }
 
 const TimeFormat = time.RFC1123
 
 // Returns the location for the index
 func (il *ItemListHelper) RepoLocation() string {
-  return path.Join("repos",strconv.FormatInt(int64(il.Id),10))
+  return path.Join("repos",il.Key,strconv.FormatInt(int64(il.Id),10))
 }
 
 // Returns the location for the collection to index
 func (il *ItemListHelper) DataLocation() string {
-  return path.Join("data",strconv.FormatInt(int64(il.Id),10))
+  return path.Join("data",il.Key,strconv.FormatInt(int64(il.Id),10))
 }
 
 // Returns the location for the config files
 func (il *ItemListHelper) ConfigLocation() string {
-  return path.Join("config",strconv.FormatInt(int64(il.Id),10))
+  return path.Join("config",il.Key,strconv.FormatInt(int64(il.Id),10))
 }
 
 // Deletes the index directory for this collection 
@@ -57,6 +58,12 @@ func (il *ItemListHelper) RemoveConfig() (err error) {
 // Creates the config directory for this collection
 func (il *ItemListHelper) MkdirConfig() (err error) {
   err = os.MkdirAll(il.ConfigLocation(),os.ModeDir | 0755)
+  return
+}
+
+// Creates the repo directory for this collection
+func (il *ItemListHelper) MkdirRepo() (err error) {
+  err = os.MkdirAll(il.RepoLocation(),os.ModeDir | 0755)
   return
 }
 
@@ -93,7 +100,6 @@ func (il *ItemListHelper) MakeReadyForDownload() (err error) {
   }
 
   err = il.MkdirConfig()
-
   return
 }
 

@@ -5,6 +5,5 @@
     "IndriRunQuery":"/Users/tim/indri-5.6/runquery/IndriRunQuery"
   },
   "ApiPath":"http://ic2-hcsvlab-staging2-vm.intersect.org.au/",
-  "ApiKey":""
   "WebDir":"web"
 }

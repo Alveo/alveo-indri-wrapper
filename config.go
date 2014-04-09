@@ -14,7 +14,6 @@ type ConfigPaths struct {
 type Config struct {
   Binaries ConfigPaths
   ApiPath string
-  ApiKey string
   WebDir string
 }
 

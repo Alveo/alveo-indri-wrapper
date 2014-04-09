@@ -42,7 +42,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
       log.Println("Error: Worker encountered",erro)
       continue
     }
-    fileName := item.Metadata["hcsvlab:handle"]
+    fileName := item.Metadata["alveo:handle"]
 
     block := make(chan int,2)
     go func(item hcsvlabapi.Item) {
@@ -117,17 +117,17 @@ type IndriService struct {
   begin gorest.EndPoint `method:"POST" path:"/indri/" postdata:"map[string]"`
 }
 
+func getApiKey(rq *http.Request) (string, error) {
+  apiCookie,err  := rq.Cookie("vlab-key")
+  if err != nil {
+    return "", err
+  }
+  return apiCookie.Value, nil
+}
+
 
 func(serv IndriService) Begin(PostData map[string][]string) {
   log.Println("Info: Asked to kickoff: ",PostData)
-
-  apiCookie,err  := serv.Context.Request().Cookie("vlab-api")
-  if err != nil {
-    log.Println("Error, cookie not found")
-  }else {
-    log.Println("Info: Cookie is " + apiCookie.String())
-  }
-
   key, ok := PostData["api_key"]
   if ! ok {
     serv.ResponseBuilder().SetResponseCode(400)
@@ -183,14 +183,24 @@ func(serv IndriService) Web(url string) string {
 
 func(serv IndriService) Progress(itemList int,after string) string{
   log.Println("Info: Index progress requested for itemlist",itemList)
-  itemListHelper := &ItemListHelper{itemList}
+
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  itemListHelper := &ItemListHelper{itemList,apiKey}
+
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
   progressMutex.Lock()
-  numProcessed := itemListsInProgress[itemList]
-  err := errorsFromIndex[itemList]
+  numProcessed, inProgress := itemListsInProgress[itemList]
+  err = errorsFromIndex[itemList]
   progressMutex.Unlock()
+
+  if ! inProgress {
+    return stringError(errors.New("Indexing not in progress"))
+  }
 
   if err != nil {
     return stringError(err)
@@ -221,7 +231,11 @@ func(serv IndriService) Progress(itemList int,after string) string{
 
 func(serv IndriService) Queryall(itemList int, query string) string{
   log.Println("Info: Query all recieved request for itemlist",itemList, " with query",query)
-  itemListHelper := &ItemListHelper{itemList}
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  itemListHelper := &ItemListHelper{itemList,apiKey}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
@@ -296,7 +310,11 @@ func(serv IndriService) Queryall(itemList int, query string) string{
 
 func(serv IndriService) Query(itemList int, query string) string{
   log.Println("Info: Query for doc matches received:",query)
-  itemListHelper := &ItemListHelper{itemList}
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  itemListHelper := &ItemListHelper{itemList,apiKey}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
 
@@ -353,13 +371,16 @@ func(serv IndriService) Query(itemList int, query string) string{
 
 func(serv IndriService) Index(itemList int) string{
   log.Println("Info: Request to index itemList",itemList)
-  itemListHelper := &ItemListHelper{itemList}
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  itemListHelper := &ItemListHelper{itemList,apiKey}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   // Declare upfront because of use of goto
   cmd := exec.Command(config.Binaries.IndriBuildIndex, path.Join(itemListHelper.ConfigLocation(),"index.properties"))
   var out bytes.Buffer
-  var err error
 
   progressMutex.Lock()
   if itemListsInProgress[itemList] != 0 {
@@ -380,13 +401,19 @@ func(serv IndriService) Index(itemList int) string{
     }()
 
     // processing begins here
-    err = obtainAndIndex(10,itemList,config.ApiPath,config.ApiKey)
+    log.Println("Info: API Key is ", itemListHelper.Key)
+    err = obtainAndIndex(10,itemList,config.ApiPath,itemListHelper.Key)
     if err != nil {
       goto errHandle
     }
 
     log.Println("Progress: Removing old index")
     err = itemListHelper.RemoveRepo()
+    if err != nil {
+      goto errHandle
+    }
+
+    err = itemListHelper.MkdirRepo()
     if err != nil {
       goto errHandle
     }
@@ -492,8 +519,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
   if err != nil {
     return
   }
-
-  itemListHelper := &ItemListHelper{itemListId}
+  itemListHelper := &ItemListHelper{itemListId,apiKey}
 
   err = itemListHelper.MakeReadyForDownload()
   if err != nil {
