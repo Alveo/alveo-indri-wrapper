@@ -6,6 +6,7 @@ import (
   "bufio"
   "path"
   "fmt"
+  "io/ioutil"
   "errors"
   "strconv"
   "github.com/TimothyJones/hcsvlabapi"
@@ -218,6 +219,17 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
       fmt.Fprintf(ixWriter,"<field><name>%s</name></field>\n",field)
     }
     fmt.Fprintf(ixWriter,"</parameters>")
+
+    // write tagnames to a file
+    tagNames, err := tn.Dump()
+    if err != nil {
+      log.Println("Error: Unable to marshall the tagnames:",err)
+    } else {
+      err = ioutil.WriteFile(path.Join(itemListHelper.ConfigLocation(),"tagNames.json"),tagNames,0600)
+      if err != nil {
+        log.Println("Error: Unable to write tagnames to file:",err)
+      }
+    }
   }()
 
   itemListHelper.SetSize(len(il.Items))

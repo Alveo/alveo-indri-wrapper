@@ -5,6 +5,7 @@ import (
   "unicode"
   "fmt"
   "errors"
+  "encoding/json"
   "log"
 )
 
@@ -24,6 +25,15 @@ func isNotLower(r rune) rune {
     return r
   }
   return -1
+}
+
+func (tn *TagNameConverter) Dump() ([]byte, error) {
+  bytes, err := json.Marshal(tn.Names)
+  if err != nil {
+    return nil, err
+  }
+
+  return bytes, nil
 }
 
 func (tn *TagNameConverter) Name(original string) (string, error) {
