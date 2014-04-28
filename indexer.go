@@ -123,7 +123,6 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     // This is the annotations processor
     // It also writes the index file
     tagid := 1
-    docid := 1
     defer func() {
       doneWriting <- 1
     }()
@@ -181,22 +180,38 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
             log.Println("Error: Unable to convert end annotation",annotation.Start,"to int")
             continue
           }
-          annoName,err := tn.Name(annotation.Label)
+          if annotation.Type != "" {
+            annoName,err := tn.Name(annotation.Type)
 
-          if err == nil {
-            if aEnd-aStart == 0 {
-              // docno, ATTRIBUTE or TAG,id, name, start , length (ignored for attribute), value (optional int64 for TAGs, string for attribute) , parent,debyg
-              fmt.Fprintf(annWriter,"%s\tATTRIBUTE\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+            if err == nil {
+              if aEnd-aStart == 0 {
+                // docno, ATTRIBUTE or TAG,id, name, start , length (ignored for attribute), value (optional int64 for TAGs, string for attribute) , parent,debyg
+                fmt.Fprintf(annWriter,"%s\tATTRIBUTE\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+              } else {
+                fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+              }
+              tagid++
             } else {
-              fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+              log.Println("Error: Unable to find a name for this annotation:",annotation.Label)
             }
-            tagid++
-          } else {
-            log.Println("Error: Unable to find a name for this annotation:",annotation.Label)
+          }
+          if annotation.Label != "" {
+            annoName,err := tn.Name(annotation.Label)
+
+            if err == nil {
+              if aEnd-aStart == 0 {
+                // docno, ATTRIBUTE or TAG,id, name, start , length (ignored for attribute), value (optional int64 for TAGs, string for attribute) , parent,debyg
+                fmt.Fprintf(annWriter,"%s\tATTRIBUTE\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+              } else {
+                fmt.Fprintf(annWriter,"%s\tTAG\t%d\t%s\t%d\t%d\t\t0\t\n",da.Filename,tagid,annoName,aStart,aEnd-aStart)
+              }
+              tagid++
+            } else {
+              log.Println("Error: Unable to find a name for this annotation:",annotation.Label)
+            }
           }
         }
       }
-      docid++
     }
     fmt.Fprintf(ixWriter,"</corpus>")
     for field := range tn.Used {
