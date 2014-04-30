@@ -19,10 +19,6 @@ import (
   "time"
 )
 
-func getUrlForDocId(docId string) string {
-  return config.ApiPath + "/catalog/" + docId
-}
-
 func getApiKey(rq *http.Request) (string, error) {
   apiCookie,err  := rq.Cookie("vlab-key")
   if err != nil {
@@ -31,8 +27,20 @@ func getApiKey(rq *http.Request) (string, error) {
   return apiCookie.Value, nil
 }
 
+func getApiLocation(rq *http.Request) (string, error) {
+  apiCookie,err  := rq.Cookie("vlab-api")
+  if err != nil {
+    return "", err
+  }
+  return apiCookie.Value, nil
+}
+
 func urlMarshall(v interface{}) ([]byte, error) {
   return nil, nil
+}
+
+func getUrlForDocId(apiLocation string, docId string) string {
+  return apiLocation + "/catalog/" + docId
 }
 
 func urlUnMarshall(data []byte, v interface{}) error {
@@ -72,6 +80,10 @@ func(serv IndriService) Query(itemList int, query string) string{
   apiKey, err := getApiKey(serv.Context.Request())
   if err != nil {
     return stringError(errors.New("No API key specified"))
+  }
+  apiLoc, err := getApiLocation(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API location specified"))
   }
   itemListHelper := NewItemListHelper(itemList,apiKey)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
@@ -116,7 +128,7 @@ func(serv IndriService) Query(itemList int, query string) string{
        log.Println("Error: Couldn't parse end in result")
       }
       docId := itemListHelper.docIdForFile(A[1])
-      match := &MatchDoc{docId,getUrlForDocId(docId),start,end}
+      match := &MatchDoc{docId,getUrlForDocId(apiLoc,docId),start,end}
       res.Matches = append(res.Matches,match)
     }
   }
@@ -133,6 +145,10 @@ func(serv IndriService) Queryall(itemList int, query string) string{
   apiKey, err := getApiKey(serv.Context.Request())
   if err != nil {
     return stringError(errors.New("No API key specified"))
+  }
+  apiLoc, err := getApiLocation(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API location specified"))
   }
   itemListHelper := NewItemListHelper(itemList,apiKey)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
@@ -187,7 +203,7 @@ func(serv IndriService) Queryall(itemList int, query string) string{
       state = 3
     } else if state == 3 {
       match = scanner.Text()
-      item := &MatchItem{docId,getUrlForDocId(docId),location,match}
+      item := &MatchItem{docId,getUrlForDocId(apiLoc,docId),location,match}
       res.Matches = append(res.Matches,item)
       log.Println("Progress: Found match",item)
 
@@ -214,6 +230,11 @@ func(serv IndriService) Index(itemList int) string{
   if err != nil {
     return stringError(errors.New("No API key specified"))
   }
+  apiLoc, err := getApiLocation(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API location specified"))
+  }
+
   itemListHelper := NewItemListHelper(itemList,apiKey)
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
@@ -236,7 +257,7 @@ func(serv IndriService) Index(itemList int) string{
 
     // processing begins here
     log.Println("Info: API Key is ", itemListHelper.Key)
-    err = obtainAndIndex(10,itemList,config.ApiPath,itemListHelper.Key)
+    err = obtainAndIndex(10,itemList,apiLoc,itemListHelper.Key)
     if err != nil {
       goto errHandle
     }
@@ -374,7 +395,8 @@ func(serv IndriService) Begin(PostData map[string][]string) {
     return
   }
   itemListIdString := apiLocation[0][idxSlash+1:]
-  apiBase := strings.TrimSuffix(apiLocation[0],"/itemlist/" + itemListIdString)
+  apiBase := strings.TrimSuffix(apiLocation[0],"/item_lists/" + itemListIdString)
+  log.Println("Info: Setting apiBase to",apiBase, "from", apiLocation[0])
   itemListIdString = strings.TrimSuffix(itemListIdString,".json")
 
   serv.ResponseBuilder().AddHeader("Set-Cookie","vlab-action-itemlist=" + itemListIdString)
