@@ -25,6 +25,6 @@ func main() {
   gorest.RegisterMarshaller("application/x-www-form-urlencoded", NewUrlMarshaller())
   gorest.RegisterService(new(IndriService)) //Register our service
   http.Handle("/",gorest.Handle())
-  http.ListenAndServe(":8787",nil)
+  http.ListenAndServe(":"+config.Port,nil)
 }
 

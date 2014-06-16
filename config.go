@@ -14,6 +14,7 @@ type ConfigPaths struct {
 type Config struct {
   Binaries ConfigPaths
   WebDir string
+  Port string
 }
 
 func ReadConfig() (conf Config, err error) {
