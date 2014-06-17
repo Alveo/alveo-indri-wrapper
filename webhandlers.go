@@ -9,6 +9,7 @@ import (
   "fmt"
   "io/ioutil"
   "log"
+  "os"
   "net/http"
   "net/url"
   "os/exec"
@@ -356,6 +357,9 @@ func(serv IndriService) Web(url string) string {
   url = strings.TrimLeft(url,"/\\.")
   begin, err := ioutil.ReadFile(path.Join(config.WebDir,path.Clean(url)))
   if err != nil {
+    if os.IsNotExist(err) {
+      serv.ResponseBuilder().SetResponseCode(404)
+    }
     serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
     serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
     return stringError(err)
@@ -363,6 +367,10 @@ func(serv IndriService) Web(url string) string {
 
   if strings.HasSuffix(url,".js") {
     serv.ResponseBuilder().SetContentType("text/javascript; charset=\"utf-8\"")
+  } else if strings.HasSuffix(url,".css") {
+    serv.ResponseBuilder().SetContentType("text/css; charset=\"utf-8\"")
+  } else if strings.HasSuffix(url,".png") {
+    serv.ResponseBuilder().SetContentType("image/png;")
   } else {
     serv.ResponseBuilder().SetContentType("text/html; charset=\"utf-8\"")
   }
