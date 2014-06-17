@@ -14,7 +14,9 @@
       
     }
   </style>
-  <link href="https://ic2-hcsvlab-staging2-vm.intersect.org.au/assets/application-ceba2be862b0c95dacc287f10d61b884.css" media="screen" rel="stylesheet" type="text/css">
+  <!-- <link href="https://ic2-hcsvlab-staging2-vm.intersect.org.au/assets/application-ceba2be862b0c95dacc287f10d61b884.css" media="screen" rel="stylesheet" type="text/css"> -->
+  <link href="vlab.css" media="screen" rel="stylesheet" type="text/css">
+  <title>Alveo Indri Search</title>
 </head>
 
 <body>
@@ -23,16 +25,13 @@
     <div class="navbar-inner">
       <div class="container">
         <div class="row-fluid">
-          <a href="/" class="brand">Alveo</a>
+          <a href="/indri/index.html" class="brand">Alveo Indri</a>
           <ul class="nav">
             <li class="active">
             <a href="/indri/index.html">Query</a>
             </li>
             <li>
-            <a href="/item_lists">Item Lists</a>
-            </li>
-            <li>
-            <a href="/catalog">Collections</a>
+            <a href="/indri/kickoff.html">Index a new itemlist</a>
             </li>
           </ul>
         </div>
@@ -47,7 +46,7 @@
     <div id="sidebar" class="span3">
       <div id="facets" class="facets sidenav">
         <h4>
-          Search this itemlist
+          Search an itemlist
         </h4>                 
         <div class="facets-collapse">
           <form id="search" class="search-query-form form-inline clearfix">
@@ -71,9 +70,22 @@
         </div>
       </div>
     </div>
-    <div id="time"> </div>
-    <div id="progress"></div>
-    <div id="results"> </div>
+    <div id="content" class="span9">
+      <div id="time"> </div>
+      <div id="progress"></div>
+      <div id="results"> </div>
+    </div>
+  </div>
+  <div class="footer row-fluid clearfix">
+    <div class="span3">
+      <img alt="Nectar" src="nectar-1966aec8c9e4954e750f560979da7e91.png">
+    </div>
+    <div class="span9">
+      The University of Western Sydney is proud to be in partnership, and acknowledge funding from, the National eResearch Collaboration Tools and Resources (NeCTAR) project
+      <a href="http://www.nectar.org.au">http://www.nectar.org.au</a>
+      to develop the Alveo.
+      NeCTAR is an Australian Government project conducted as part of the Super Science initiative and financed by the Education Investment Fund.
+    </div>
   </div>
 </div>
 
