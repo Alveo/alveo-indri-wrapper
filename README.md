@@ -36,3 +36,9 @@ That's it! You can run it with:
 	
 In the directory where `config.json` is stored.
    
+#Further documentation
+
+Further documentation is available in the `doc` directory. That includes:
+
+ * administer.md: Documentation for admins of this system. Read this next.
+ * userdoc.md: Documentation for users of this system.
