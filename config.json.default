@@ -1,8 +1,8 @@
 {
   "Binaries": {
-    "IndriBuildIndex":"/Users/tim/indri-5.6/buildindex/IndriBuildIndex",
-    "QueryAll":"/Users/tim/office/c/snipped/example",
-    "IndriRunQuery":"/Users/tim/indri-5.6/runquery/IndriRunQuery"
+    "IndriBuildIndex":"",
+    "QueryAll":"",
+    "IndriRunQuery":"",
   },
   "WebDir":"web"
   "Port":"8787"
