@@ -34,7 +34,25 @@ Here is an annotated version of `config.json`
 The wrapper provides a RESTful json API to handle Alveo itemlists. It has hooks to create Indri indexes from Alveo Itemlists, and two different ways of querying those indexes.
 Offset metadata is handled by default, and is available at query time.
 
-## Index uniqueness
+There are two ways of querying indexes:
+
+* *By document*: This provides traditional matches, where the document IDs for documents that match the query are returned.
+* *All matches*: This provides a list of all the locations within documents that match the query. Where possible, result snippets are provided.
+
+To create an index, use either the REST API location `/indri/index/{itemlist id}` described below, or the web interface at `/indri/kickoff.html`.
+
+### Indri query language primer
+
+* For simple term searches, use the terms on their own. (eg `cat dog` will search for documents containing both `cat` and `dog`).
+* To match metadata, use the metadata name in lowercase without spaces or symbols. (eg `cat.overlap` will search for `cat` in fields named `overlap`. Or, `cat.speaker1` will search for `cat` in fields named `speaker 1` or `speaker(1)`.
+* For phrase queries, use `#1(cat dog)`. This matches documents where `cat` appears next to `dog`. The `#1` means "within one term of each other".
+* For window queries, you can increase the window size. For example, `#2(cat dog)` matches documents where `cat` appears before `dog` and they are within two terms of each other.
+* You can also use an unordered window. For example, `#uw3(cat dog)` matches documents where cat and dog appear in any order within three terms of each other.
+* All of the above can be combined. For example `#1(cat.overlap dog)`
+
+For further information, see the [indri query language documentation](http://sourceforge.net/p/lemur/wiki/The%20Indri%20Query%20Language/)
+
+### Index uniqueness
 
 Indexes are stored using a tuple of the API key and itemlist ID as the key. This means that each index of an itemlist 
 is unique for a particular Alveo key. If other Alveo users with different API keys want to query an indri index, they
@@ -44,7 +62,7 @@ Note that there is no versioning of itemlists- itemlists are not checked to see 
 queried. However, all query responses include the time that the index was created. This can be used by users to
 determine whether a re-index is required.
 
-## Reindexing itemlists
+### Reindexing itemlists
 
 If you wish to manually rebuild an itemlist index from the copy currently stored inside Alveo,
 you can do this from the `index a new itemlist` tab. Alternatively, you can use the REST API, by sending a request to `/indri/index/{itemlist id}`.
