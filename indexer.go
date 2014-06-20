@@ -9,16 +9,16 @@ import (
   "io/ioutil"
   "errors"
   "strconv"
-  "github.com/TimothyJones/hcsvlabapi"
+  "github.com/Alveo/alveo-golang-rest-client/alveoapi"
 )
 
 
 type documentAnnotations struct {
   Filename string
-  AnnotationList* hcsvlabapi.AnnotationList
+  AnnotationList* alveoapi.AnnotationList
 }
 
-func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListHelper *ItemListHelper) {
+func worker(api alveoapi.Api,requests chan string,done chan int, annotationsProcessor chan *documentAnnotations,itemListHelper *ItemListHelper) {
   for r := range requests {
     item, erro := api.GetItemFromUri(r)
     if erro != nil {
@@ -28,7 +28,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
     fileName := item.Metadata["alveo:handle"]
 
     block := make(chan int,2)
-    go func(item hcsvlabapi.Item) {
+    go func(item alveoapi.Item) {
       data, err := api.Get(item.Primary_text_url)
       if err != nil {
         log.Println("Error: obtaining item from API",err)
@@ -59,7 +59,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
       block <- 1
     }(item)
 
-    go func(item hcsvlabapi.Item) {
+    go func(item alveoapi.Item) {
       annotations, err := api.GetAnnotations(item)
       if err != nil {
         log.Println("Error: obtaining annotations",err)
@@ -88,7 +88,7 @@ func worker(api hcsvlabapi.Api,requests chan string,done chan int, annotationsPr
 func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string) (err error){
   log.Println("Progress: Checking itemlists to see if",itemListId, "is in progress")
   log.Println("Progress: Indexing itemlist",itemListId,"with number of workers:",numWorkers)
-  api := hcsvlabapi.Api{apiBase,apiKey}
+  api := alveoapi.Api{apiBase,apiKey}
   ver,err := api.GetVersion()
   if err != nil {
     return
