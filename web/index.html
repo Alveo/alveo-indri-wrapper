@@ -202,7 +202,7 @@
               $("<div/>",{
                 "class":"result",
                 "id":"result" + index, 
-                "text":data.Matches[index].match,
+                "html":data.Matches[index].match,
               }).appendTo("#results");
 
               $("#result" + index).prepend($("<h3/>",{
