@@ -8,6 +8,7 @@ import (
   "fmt"
   "io/ioutil"
   "errors"
+  "encoding/json"
   "strconv"
   "github.com/Alveo/alveo-golang-rest-client/alveoapi"
 )
@@ -227,6 +228,17 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
         log.Println("Error: Unable to write tagnames to file:",err)
       }
     }
+    // write itemlist to a file
+    itemListJson, err := json.Marshal(il)
+    if err != nil {
+      log.Println("Error: Unable to marshall the itemlist:",err)
+    } else {
+      err = ioutil.WriteFile(path.Join(itemListHelper.ConfigLocation(),"itemlist.json"),itemListJson,0600)
+      if err != nil {
+        log.Println("Error: Unable to write itemlist to file:",err)
+      }
+    }
+
   }()
 
   itemListHelper.SetSize(len(il.Items))
