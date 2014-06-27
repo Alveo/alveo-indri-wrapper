@@ -52,7 +52,8 @@
           <form id="search" class="search-query-form form-inline clearfix">
             <ul class="clearfix" id="searchbar">
               <div class="input-append pull-left">
-                <input name="il" placeholder="Itemlist id" type="text">
+                <select name="il" placeholder="Itemlist id" required="true">
+                </select>
               </div>
               <div class="input-append pull-left">
                 <input class="search_q q" name="query" placeholder="Search query" type="text">
@@ -92,7 +93,26 @@
     <script> 
       function error(str) {
         alert(str);
-    }
+      }
+    $(function() {
+      $.getJSON("/indri/itemlists/",function(data) {
+        switch (data["type"])  {
+          case "itemlists":
+            for (index = 0; index < data.ItemLists.length; index++) {
+              var newOption = $('<option>');
+              newOption.attr('value',data.ItemLists[index].id).text(data.ItemLists[index].name);
+              $("[name='il']").append(newOption);
+            }
+          break;
+          case "error":
+            $("<div/>", {
+              "class":"error",
+              "text":"Error when obtaining itemlists: " + data.error,
+            }).appendTo("#progress");
+          break;
+        }
+      });
+    });
 
     $( "#index" ).submit(function (event) {
       var itemList = $(this).children("[name='il']").val();
