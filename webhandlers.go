@@ -5,6 +5,7 @@ import (
   "bytes"
   "code.google.com/p/gorest"
   "encoding/json"
+  "path/filepath"
   "errors"
   "fmt"
   "io/ioutil"
@@ -18,6 +19,7 @@ import (
   "strconv"
   "strings"
   "time"
+  "github.com/Alveo/alveo-golang-rest-client/alveoapi"
 )
 
 func getApiKey(rq *http.Request) (string, error) {
@@ -69,9 +71,53 @@ type IndriService struct {
   query  gorest.EndPoint `method:"GET" path:"/indri/query/doc/{itemList:int}/{query:string}" output:"string"`
   queryall  gorest.EndPoint `method:"GET" path:"/indri/query/all/{itemList:int}/{query:string}" output:"string"`
   index    gorest.EndPoint `method:"GET" path:"/indri/index/{itemList:int}" output:"string"`
+  itemlists    gorest.EndPoint `method:"GET" path:"/indri/itemlists/" output:"string"`
   progress gorest.EndPoint `method:"GET" path:"/indri/progress/{itemList:int}/{after:string}" output:"string"`
   web gorest.EndPoint `method:"GET" path:"/indri/{url:string}" output:"string"`
   begin gorest.EndPoint `method:"POST" path:"/indri/" postdata:"map[string]"`
+}
+
+func(serv IndriService) Itemlists() string{
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  //apiLoc, err := getApiLocation(serv.Context.Request())
+  //if err != nil {
+  //  return stringError(errors.New("No API location specified"))
+  //}
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+  itemListHelper := NewItemListHelper(0,apiKey)
+
+  baseDir := filepath.Dir(itemListHelper.ConfigLocation())
+
+  files, _ := ioutil.ReadDir(baseDir)
+
+  var res ItemListsResponse
+  res.Class = "itemlists"
+  res.ItemLists = make([]*ItemListTuple, 0, len(files))
+
+  for _, f := range files {
+    if f.IsDir() {
+      itemListJson, err := ioutil.ReadFile(path.Join(baseDir,f.Name(),"itemlist.json"))
+      var il alveoapi.ItemList
+      if err == nil {
+        err = json.Unmarshal(itemListJson,&il)
+        if err != nil {
+          log.Println("Error: Couldn't unmarshal json from",path.Join(baseDir,f.Name(),"itemlist.json"))
+        } else {
+          item := &ItemListTuple{il.Name,f.Name()}
+          res.ItemLists = append(res.ItemLists,item)
+        }
+      }
+    }
+  }
+  result, errMars := json.Marshal(res);
+  if errMars != nil {
+    return stringError(errMars)
+  }
+  return string(result)
 }
 
 

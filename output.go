@@ -22,6 +22,16 @@ type IndexProgressResponse struct {
   IndexCreatedTime string `json:"index_created_time"`
 }
 
+type ItemListsResponse struct {
+  Class string `json:"type"`
+  ItemLists []*ItemListTuple
+}
+
+type ItemListTuple struct {
+  Name string `json:"name"`
+  Id string `json:"id"`
+}
+
 type AllQueryResult struct {
   Class string `json:"type"`
   IndexCreatedTime string `json:"index_created_time"`

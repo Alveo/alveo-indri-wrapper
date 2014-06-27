@@ -137,6 +137,19 @@ All responses from the API include a `type` field. This can be used to determine
         ]
         /* Further matches go here */
       }
+* `indri/itemlists/`: Used to provide a list of itemlists currently indexed by the wrapper. A typical response is:
+
+      {
+        "type":"itemlists", // Always 'itemlists' when there are no errors
+        "ItemLists":[ // an array containing all the itemlist name/id pairs
+          {
+            "name":"Item list name", // The display name of the itemlist
+            "id":"54" // The id of the itemlist
+          }
+        /* Further itemlists go here */
+        ]
+      }
+
 
 
 ###Kickoff with a POST request
