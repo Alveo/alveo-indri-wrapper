@@ -6,6 +6,7 @@ import (
   "errors"
   "strings"
   "time"
+  "unicode"
   "strconv"
   "os"
   "log"
@@ -26,7 +27,15 @@ var itemListLocks struct {
 
 // Returns a new itemlisthelper for this id and key pair
 func NewItemListHelper(id int, key string) (*ItemListHelper){
-  return &ItemListHelper{id, key, strconv.Itoa(id) + key}
+  removeNonAlphaNum := func(r rune) rune {
+      if unicode.IsDigit(r) || unicode.IsLetter(r) {
+        return r
+      }
+      return -1
+  }
+
+  keyClean := strings.Map(removeNonAlphaNum,key)
+  return &ItemListHelper{id, keyClean, strconv.Itoa(id) + key}
 }
 
 const TimeFormat = time.RFC1123
