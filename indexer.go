@@ -95,7 +95,7 @@ func obtainAndIndex(numWorkers int, itemListId int,apiBase string, apiKey string
     return
   }
 
-  if ver.Api_version != "Sprint_23_demo" {
+  if ver.Api_version != "v3" {
     err = errors.New("Server API version is incorrect:" + ver.Api_version)
     return
   }
