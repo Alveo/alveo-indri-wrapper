@@ -79,7 +79,7 @@ type IndriService struct {
   begin gorest.EndPoint `method:"POST" path:"/indri/" postdata:"map[string]"`
 }
 
-func(serv IndriService) ServerItemlists(itemList int) string{
+func(serv IndriService) ServerItemlists() string{
   apiKey, err := getApiKey(serv.Context.Request())
   if err != nil {
     return stringError(errors.New("No API key specified"))
