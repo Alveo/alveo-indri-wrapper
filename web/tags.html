@@ -9,7 +9,9 @@
     .result {
       padding: 10px;
     }
-
+    table th {
+      font-weight: bold;
+    }
     .error {
       
     }
@@ -59,8 +61,7 @@
                 </select>
               </div>
               <div class="input-append pull-left">
-                <input class="search_q q" name="query" placeholder="Search query" type="text">
-                <button type="submit" class="btn search-btn" value="Search"><i class="icon-search"></i></button>  
+                <button type="button" class="btn search-btn" value="Search"><i class="icon-search"></i></button>  
               </div>
             </ul>
           </form>                             
@@ -69,8 +70,9 @@
     </div>
     <div id="content" class="span9">
       <div id="time"> </div>
-      <div id="progress"></div>
-      <div id="results"> </div>
+      <div id="progress">
+	</div>
+      <div id="results"><table></table> </div>
     </div>
   </div>
   <div class="footer row-fluid clearfix">
@@ -80,7 +82,7 @@
     <div class="span9">
       The University of Western Sydney is proud to be in partnership, and acknowledge funding from, the National eResearch Collaboration Tools and Resources (NeCTAR) project
       <a href="http://www.nectar.org.au">http://www.nectar.org.au</a>
-      to develop the Alveo.
+      to develop the Alveo.x
       NeCTAR is an Australian Government project conducted as part of the Super Science initiative and financed by the Education Investment Fund.
     </div>
   </div>
@@ -110,24 +112,29 @@
       });
     });
 
-    $( "#index" ).submit(function (event) {
-      var itemList = $(this).children("[name='il']").val();
+    $( "button" ).click(function (event) {
+      var itemList = $("[name='il']").val();
       $.getJSON("/indri/annotations/"+ itemList, function (data) {
         console.log(data);
-          if data.hasOwnProperty("type") && data["type"] == "error" {
+          if( data.hasOwnProperty("type") && data["type"] == "error" ){
             $("<div/>", {
               "class":"error",
               "text":"Error when indexing: " + data.error,
             }).appendTo("#progress");
             clearInterval(checkForUpdates);
           } else {
+	    $("table").text();
+	    $("table").append("<tr><th>Alveo tag</th><th>Indri tag</th></tr>");
             for(var tag in data) {
+	      if(!(tag.trim() == '') ){
+              	$("table").append("<tr><td>"+tag + "</td><td>"+data[tag] + "</td></tr>");
+	      }	
               console.log(tag + " is " + data[tag]); 
             }
           }
       });
               
-
+	event.preventDefault();
   });
   </script>
 </body>
