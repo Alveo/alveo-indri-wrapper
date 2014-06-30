@@ -50,7 +50,7 @@ To create an index, use either the REST API location `/indri/index/{itemlist id}
 * You can also use an unordered window. For example, `#uw3(cat dog)` matches documents where cat and dog appear in any order within three terms of each other.
 * All of the above can be combined. For example `#1(cat.overlap dog)`
 
-For further information, see the [indri query language documentation](http://sourceforge.net/p/lemur/wiki/The%20Indri%20Query%20Language/)
+For further information, see the [indri query language documentation](http://sourceforge.net/p/lemur/wiki/The%20Indri%20Query%20Language/) or the [quick reference guide](http://ciir.cs.umass.edu/~metzler/indriquerylang.pdf)
 
 ### Index uniqueness
 
