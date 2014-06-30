@@ -23,7 +23,7 @@ Installation instructions:
 	 go get github.com/Alveo/alveo-indri-wrapper
      go install github.com/Alveo/alveo-indri-wrapper
 
-Next, you'll want to edit the config file to include your API key, the location of the Alveo API, and the location of the indri binaries.
+Next, you'll need to edit the config file to include the location of the indri binaries and the port you want the wrapper to run on.
 	 
 	 # create and edit the config file
 	 cd $GOPATH/src/github.com/TimothyJones/hcsvlab-consumer
