@@ -74,18 +74,33 @@ type IndriService struct {
   itemlists    gorest.EndPoint `method:"GET" path:"/indri/itemlists/" output:"string"`
   progress gorest.EndPoint `method:"GET" path:"/indri/progress/{itemList:int}/{after:string}" output:"string"`
   web gorest.EndPoint `method:"GET" path:"/indri/{url:string}" output:"string"`
+  annotations gorest.EndPoint `method:"GET" path:"/indri/annotations/{itemList:int}" output:"string"`
   begin gorest.EndPoint `method:"POST" path:"/indri/" postdata:"map[string]"`
 }
+
+func(serv IndriService) Annotations(itemList int) string{
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+  itemListHelper := NewItemListHelper(itemList,apiKey)
+
+  annotationsJson, err := ioutil.ReadFile(path.Join(itemListHelper.ConfigLocation(),"tagNames.json"))
+  if err != nil {
+    return stringError(err)
+  }
+
+  return string(annotationsJson)
+}
+
 
 func(serv IndriService) Itemlists() string{
   apiKey, err := getApiKey(serv.Context.Request())
   if err != nil {
     return stringError(errors.New("No API key specified"))
   }
-  //apiLoc, err := getApiLocation(serv.Context.Request())
-  //if err != nil {
-  //  return stringError(errors.New("No API location specified"))
-  //}
   serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
   serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
   itemListHelper := NewItemListHelper(0,apiKey)
