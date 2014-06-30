@@ -72,11 +72,50 @@ type IndriService struct {
   queryall  gorest.EndPoint `method:"GET" path:"/indri/query/all/{itemList:int}/{query:string}" output:"string"`
   index    gorest.EndPoint `method:"GET" path:"/indri/index/{itemList:int}" output:"string"`
   itemlists    gorest.EndPoint `method:"GET" path:"/indri/itemlists/" output:"string"`
+  serverItemlists    gorest.EndPoint `method:"GET" path:"/indri/server_itemlists/" output:"string"`
   progress gorest.EndPoint `method:"GET" path:"/indri/progress/{itemList:int}/{after:string}" output:"string"`
   web gorest.EndPoint `method:"GET" path:"/indri/{url:string}" output:"string"`
   annotations gorest.EndPoint `method:"GET" path:"/indri/annotations/{itemList:int}" output:"string"`
   begin gorest.EndPoint `method:"POST" path:"/indri/" postdata:"map[string]"`
 }
+
+func(serv IndriService) ServerItemlists(itemList int) string{
+  apiKey, err := getApiKey(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API key specified"))
+  }
+  apiLoc, err := getApiLocation(serv.Context.Request())
+  if err != nil {
+    return stringError(errors.New("No API location specified"))
+  }
+  serv.ResponseBuilder().SetHeader("Access-Control-Allow-Origin","*")
+  serv.ResponseBuilder().SetContentType("application/json; charset=\"utf-8\"")
+
+  api := alveoapi.Api{apiLoc,apiKey}
+
+  ver,err := api.GetVersion()
+  if err != nil {
+    return stringError(err)
+  }
+
+  if ver.Api_version != "v3" {
+    err := errors.New("Server API version is incorrect:" + ver.Api_version)
+    return stringError(err)
+  }
+
+  itemLists, err := api.GetItemLists()
+  if err != nil {
+    return stringError(err)
+  }
+
+  response, err := json.Marshal(itemLists)
+  if err != nil {
+    return stringError(err)
+  }
+
+  return string(response)
+}
+
 
 func(serv IndriService) Annotations(itemList int) string{
   apiKey, err := getApiKey(serv.Context.Request())
@@ -94,6 +133,8 @@ func(serv IndriService) Annotations(itemList int) string{
 
   return string(annotationsJson)
 }
+
+
 
 
 func(serv IndriService) Itemlists() string{
