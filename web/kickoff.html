@@ -53,7 +53,15 @@
     </div>
   </div>
 </div>
+<script>
+  $(function() {
+    var key = $.cookie('vlab-key');
+    if(key !== undefined) {
+      $("[name='api_key']").val(key);
+    }
+  });
 
+</script>
 
 </body>
 
